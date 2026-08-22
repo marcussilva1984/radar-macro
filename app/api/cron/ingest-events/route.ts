@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { macroEvents } from "@/lib/db/schema";
-import { EVENT_FEEDS, fetchFeed, tagFromTitle } from "@/lib/sources/rssEvents";
+import { EVENT_FEEDS, fetchFeed, tagFromTitle, isCentralBankRelevant } from "@/lib/sources/rssEvents";
 
 export const maxDuration = 60;
 
@@ -20,8 +20,10 @@ export async function GET(req: Request) {
       for (const item of items) {
         if (!item.link) continue;
         const tags = tagFromTitle(item.title);
-        // Fase 1: no feed de geopolítica global, só grava se bater alguma keyword relevante.
+        // Fase 1: no feed de geopolítica global, só grava se bater alguma keyword relevante;
+        // no feed do Fed, ignora ações regulatórias contra bancos específicos (ruído).
         if (feedDef.category === "geopolitics" && tags.length === 0) continue;
+        if (feedDef.category === "central_bank" && !isCentralBankRelevant(item.title)) continue;
 
         await db
           .insert(macroEvents)
