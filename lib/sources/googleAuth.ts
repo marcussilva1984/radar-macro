@@ -10,7 +10,7 @@ const AUTH_ROW_ID = 1;
 export const YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"];
 
 function getRedirectUri(): string {
-  const base = process.env.PUBLIC_BASE_URL ?? "http://localhost:3050";
+  const base = process.env.APP_BASE_URL ?? "http://localhost:3050";
   return `${base}/api/auth/youtube/callback`;
 }
 
