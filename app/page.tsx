@@ -51,6 +51,11 @@ export default async function Home() {
                 </span>
                 <span>{e.country}</span>
                 <span>{e.publishedAt.toLocaleString("pt-BR")}</span>
+                {e.duplicateCount > 0 && (
+                  <span title="Mesmo assunto noticiado por outras fontes, agrupado aqui">
+                    +{e.duplicateCount} fonte{e.duplicateCount > 1 ? "s" : ""}
+                  </span>
+                )}
               </div>
               <a
                 href={e.sourceUrl ?? "#"}
@@ -77,6 +82,7 @@ export default async function Home() {
                   {e.moves.map((m) => (
                     <span
                       key={m.symbol}
+                      title={m.surprise !== null ? `z-score: ${m.surprise.toFixed(1)}` : undefined}
                       className={
                         (m.changePct ?? 0) >= 0
                           ? "rounded bg-green-50 px-1.5 py-0.5 text-green-700 dark:bg-green-950 dark:text-green-300"
@@ -84,6 +90,7 @@ export default async function Home() {
                       }
                     >
                       {m.label} {m.changePct?.toFixed(2)}%
+                      {m.surprise !== null && Math.abs(m.surprise) > 1.5 ? " ⚡" : ""}
                     </span>
                   ))}
                 </div>
