@@ -58,6 +58,17 @@ export const youtubeVideos = pgTable(
   ]
 );
 
+// Token OAuth do Google/YouTube (single-user — este app é só seu, não é multi-tenant).
+// refreshToken não expira sozinho; accessToken é renovado a partir dele quando expira.
+export const youtubeAuth = pgTable("youtube_auth", {
+  id: serial("id").primaryKey(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Resumo semanal gerado (Fase 1: texto simples a partir dos eventos de maior "surpresa").
 export const weeklySummaries = pgTable(
   "weekly_summaries",

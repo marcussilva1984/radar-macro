@@ -8,6 +8,13 @@
       "when": 1787439845354,
       "tag": "0000_shallow_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787441632386,
+      "tag": "0001_sticky_nightcrawler",
+      "breakpoints": true
     }
   ]
 }
