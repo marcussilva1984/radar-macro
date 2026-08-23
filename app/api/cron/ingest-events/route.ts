@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { macroEvents } from "@/lib/db/schema";
 import { EVENT_FEEDS, fetchFeed, tagFromTitle, isCentralBankRelevant } from "@/lib/sources/rssEvents";
+import { sendTelegramMessage } from "@/lib/telegram";
+import { gte, desc } from "drizzle-orm";
 
 export const maxDuration = 60;
 
@@ -45,5 +47,30 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, results });
+  // Evento mais importante do dia (Fed/fala de banco central sempre em primeiro, depois
+  // geopolítica por nº de tags) — este cron roda 1x/dia, então não precisa de dedup extra.
+  let telegramSent = false;
+  try {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const todaysEvents = await db
+      .select()
+      .from(macroEvents)
+      .where(gte(macroEvents.publishedAt, since))
+      .orderBy(desc(macroEvents.publishedAt));
+
+    const top =
+      todaysEvents.find((e) => e.category === "central_bank") ??
+      [...todaysEvents].sort((a, b) => b.tags.length - a.tags.length)[0];
+
+    if (top) {
+      await sendTelegramMessage(
+        `<b>Evento mais importante do dia (EUA/mercado)</b>\n\n${top.title}\n\n${top.sourceUrl ?? ""}`
+      );
+      telegramSent = true;
+    }
+  } catch {
+    // best-effort — não quebra a ingestão se o Telegram falhar
+  }
+
+  return NextResponse.json({ ok: true, results, telegramSent });
 }

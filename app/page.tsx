@@ -1,5 +1,6 @@
 import { getTensionIndex } from "@/lib/tensionIndex";
 import { getFearGreedIndex } from "@/lib/sources/fearGreed";
+import { getUpcomingUSEvents } from "@/lib/sources/economicCalendar";
 import { FLOW_SYMBOLS } from "@/lib/sources/flowSymbols";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export default async function Home() {
   let tension: Awaited<ReturnType<typeof getTensionIndex>> | null = null;
   let fearGreed: Awaited<ReturnType<typeof getFearGreedIndex>> = null;
   let error: string | null = null;
+  const usEvents = getUpcomingUSEvents(6);
 
   try {
     [tension, fearGreed] = await Promise.all([getTensionIndex(), getFearGreedIndex()]);
@@ -160,6 +162,30 @@ export default async function Home() {
                 sub={tension.nextEvent?.title}
               />
             </div>
+          </div>
+        )}
+
+        {usEvents.length > 0 && (
+          <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <p className="text-xs font-medium text-zinc-500">
+              Calendário da semana (EUA) — CPI, PPI, ADP, payroll, desemprego
+            </p>
+            <ul className="mt-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+              {usEvents.map((e) => (
+                <li key={e.date + e.title} className="flex items-center justify-between py-1.5 text-sm">
+                  <span className="text-zinc-700 dark:text-zinc-300">{e.title}</span>
+                  <span
+                    className={
+                      e.daysUntil <= 2
+                        ? "rounded bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300"
+                        : "rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                    }
+                  >
+                    {e.daysUntil === 0 ? "hoje" : e.daysUntil === 1 ? "amanhã" : `${e.daysUntil}d`}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </main>

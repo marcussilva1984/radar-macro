@@ -1,20 +1,46 @@
 import { getRecentVideos } from "@/lib/videos";
 import { isYoutubeConnected } from "@/lib/sources/googleAuth";
+import type { Conviction } from "@/lib/forex";
 
 export const dynamic = "force-dynamic";
 
-function VideoRow({ v }: { v: { videoId: string; channelTitle: string; title: string; publishedAt: Date } }) {
+// Mesmo esquema de cor do Forex: forte = vermelho, médio = amarelo, fraco = azul.
+const CONVICTION_BADGE: Record<Conviction, string> = {
+  forte: "bg-red-600 text-white",
+  médio: "bg-yellow-500 text-black",
+  fraco: "bg-blue-500 text-white",
+};
+const CONVICTION_BORDER: Record<Conviction, string> = {
+  forte: "border-red-300 dark:border-red-900",
+  médio: "border-yellow-300 dark:border-yellow-900",
+  fraco: "border-zinc-200 dark:border-zinc-800",
+};
+
+function VideoRow({
+  v,
+}: {
+  v: { videoId: string; channelTitle: string; title: string; publishedAt: Date; conviction: Conviction };
+}) {
   return (
-    <li className="rounded border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-      <a
-        href={`https://www.youtube.com/watch?v=${v.videoId}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-medium text-black hover:underline dark:text-zinc-50"
-      >
-        {v.title}
-      </a>
-      <div className="mt-1 text-xs text-zinc-500">
+    <li
+      className={`rounded border bg-white p-3 dark:bg-zinc-950 ${CONVICTION_BORDER[v.conviction]}`}
+    >
+      <div className="flex items-start gap-2">
+        <span
+          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[v.conviction]}`}
+        >
+          {v.conviction}
+        </span>
+        <a
+          href={`https://www.youtube.com/watch?v=${v.videoId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-black hover:underline dark:text-zinc-50"
+        >
+          {v.title}
+        </a>
+      </div>
+      <div className="mt-1 pl-[46px] text-xs text-zinc-500">
         {v.channelTitle} · {v.publishedAt.toLocaleString("pt-BR")}
       </div>
     </li>
@@ -40,7 +66,8 @@ export default async function VideosPage() {
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
         Vídeos novos dos canais que você realmente segue (via login com Google) + alerta de
         vídeos relevantes de canais que você não segue, sobre os temas do Radar Macro
-        (internacional e nacional).
+        (internacional e nacional). Ordenados por grau de importância do assunto — mesmas cores
+        da aba Forex.
       </p>
 
       {error && (
