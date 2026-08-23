@@ -180,10 +180,111 @@ function buildTradeIdeas(
   return ideas.sort((a, b) => order[a.conviction] - order[b.conviction]);
 }
 
+export interface EntradaLeg {
+  pair: FxPair;
+  action: "compra" | "venda";
+}
+
+export interface Entrada {
+  legs: [EntradaLeg, EntradaLeg];
+  hedgedCurrency: FxCurrency;
+  syntheticView: string; // ex: "NZD vs USD" — a aposta real depois de cancelar a moeda comum
+  conviction: Conviction;
+  score: number;
+  trendConsistent: boolean; // viés diário e semanal concordam na moeda sintética
+  rationale: string;
+}
+
+// Pra uma moeda C aparecer "comprada" numa perna: se C é base do par, comprar o par;
+// se C é quote, vender o par (vender X/C = vender X, comprar C).
+function actionForLong(pair: { base: string; quote: string }, currency: string): "compra" | "venda" {
+  return pair.base === currency ? "compra" : "venda";
+}
+function otherCurrency(pair: { base: string; quote: string }, currency: string): string {
+  return pair.base === currency ? pair.quote : pair.base;
+}
+function flip(a: "compra" | "venda"): "compra" | "venda" {
+  return a === "compra" ? "venda" : "compra";
+}
+
+// Gera combinações de 2 pernas que compartilham uma moeda comum em direções opostas — isso
+// cancela o risco dessa moeda e isola uma aposta "sintética" nas outras duas (o padrão pedido:
+// comprar EUR/USD + vender EUR/NZD protege o EUR e vira, na prática, uma aposta em NZD vs USD).
+function generateEntradas(
+  signals: FxPairSignal[],
+  strengthByCurrency: Map<string, number>,
+  weeklyStrengthByCurrency: Map<string, number>
+): Entrada[] {
+  const byPair = new Map(signals.map((s) => [s.pair, s]));
+  const seen = new Map<string, Entrada>(); // dedup por par sintético (ex: NZD-USD), fica a de maior convicção
+
+  for (const currency of FX_CURRENCIES) {
+    const legsWithCurrency = FX_PAIRS.filter((p) => p.base === currency || p.quote === currency);
+    for (let i = 0; i < legsWithCurrency.length; i++) {
+      for (let j = i + 1; j < legsWithCurrency.length; j++) {
+        const p1 = legsWithCurrency[i];
+        const p2 = legsWithCurrency[j];
+
+        // Perna 1: fica COMPRADA em `currency`. Perna 2: fica VENDIDA em `currency`.
+        const action1 = actionForLong(p1, currency);
+        const other1 = otherCurrency(p1, currency); // fica vendido em other1
+        const action2 = flip(actionForLong(p2, currency));
+        const other2 = otherCurrency(p2, currency); // fica comprado em other2
+        if (other1 === other2) continue;
+
+        const strDiff = (strengthByCurrency.get(other2) ?? 0) - (strengthByCurrency.get(other1) ?? 0);
+        const weeklyDiff =
+          (weeklyStrengthByCurrency.get(other2) ?? 0) - (weeklyStrengthByCurrency.get(other1) ?? 0);
+        const carryDiff = (POLICY_RATES[other2] ?? 0) - (POLICY_RATES[other1] ?? 0);
+        const score = 0.6 * strDiff + 0.2 * carryDiff + 0.2 * weeklyDiff;
+
+        // Se o sinal deu negativo, a aposta real é a oposta (vender other2 / comprar other1) —
+        // inverte as duas pernas em vez de descartar a combinação.
+        const finalScore = Math.abs(score);
+        const invert = score < 0;
+        const legs: [EntradaLeg, EntradaLeg] = invert
+          ? [
+              { pair: p1.pair, action: flip(action1) },
+              { pair: p2.pair, action: flip(action2) },
+            ]
+          : [
+              { pair: p1.pair, action: action1 },
+              { pair: p2.pair, action: action2 },
+            ];
+        const [viewLong, viewShort] = invert ? [other1, other2] : [other2, other1];
+
+        const trendConsistent =
+          Math.abs(strDiff) > TREND_THRESHOLD &&
+          Math.abs(weeklyDiff) > TREND_THRESHOLD &&
+          Math.sign(strDiff) === Math.sign(weeklyDiff);
+
+        const key = [viewLong, viewShort].sort().join("-");
+        const existing = seen.get(key);
+        if (existing && existing.score >= finalScore) continue;
+
+        const s1 = byPair.get(legs[0].pair);
+        const s2 = byPair.get(legs[1].pair);
+        seen.set(key, {
+          legs,
+          hedgedCurrency: currency as FxCurrency,
+          syntheticView: `${viewLong} vs ${viewShort}`,
+          conviction: convictionOf(finalScore),
+          score: finalScore,
+          trendConsistent,
+          rationale: `${legs[0].action} ${legs[0].pair} + ${legs[1].action} ${legs[1].pair}: cancela a exposição a ${currency} (força ${strDiff.toFixed(2)} diário / ${weeklyDiff.toFixed(2)} semanal a favor de ${viewLong} vs ${viewShort}; carry ${carryDiff >= 0 ? "+" : ""}${carryDiff.toFixed(2)}pp). Viés diário: ${s1?.changePct?.toFixed(2) ?? "—"}% / ${s2?.changePct?.toFixed(2) ?? "—"}%. Timeframe: ler entrada no 4h, direção pelo diário/semanal.`,
+        });
+      }
+    }
+  }
+
+  return [...seen.values()].sort((a, b) => b.score - a.score).slice(0, 5);
+}
+
 export async function getForexBoard(): Promise<{
   strength: CurrencyStrength[];
   signals: FxPairSignal[];
   ideas: TradeIdea[];
+  entradas: Entrada[];
   audNzdCorr: number | null;
 }> {
   const bySymbol = await getSeriesBySymbol(35);
@@ -269,6 +370,7 @@ export async function getForexBoard(): Promise<{
   }).sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
 
   const ideas = buildTradeIdeas(signals, audNzdCorr);
+  const entradas = generateEntradas(signals, strengthByCurrency, weeklyStrengthByCurrency);
 
-  return { strength, signals, ideas, audNzdCorr };
+  return { strength, signals, ideas, entradas, audNzdCorr };
 }

@@ -47,10 +47,11 @@ export default async function ForexPage() {
   let strength: Awaited<ReturnType<typeof getForexBoard>>["strength"] = [];
   let signals: Awaited<ReturnType<typeof getForexBoard>>["signals"] = [];
   let ideas: Awaited<ReturnType<typeof getForexBoard>>["ideas"] = [];
+  let entradas: Awaited<ReturnType<typeof getForexBoard>>["entradas"] = [];
   let error: string | null = null;
 
   try {
-    ({ strength, signals, ideas } = await getForexBoard());
+    ({ strength, signals, ideas, entradas } = await getForexBoard());
   } catch (e) {
     error = (e as Error).message;
   }
@@ -184,6 +185,53 @@ export default async function ForexPage() {
             ★ = tendência consistente (diário e semanal na mesma direção) — sinal mais forte que
             um movimento de um dia só.
           </p>
+        </>
+      )}
+
+      {!error && entradas.length > 0 && (
+        <>
+          <h2 className="mt-10 text-lg font-medium text-black dark:text-zinc-50">
+            5 entradas protegidas (pares assimétricos)
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Cada entrada usa 2 pernas que compartilham uma moeda comum em direções opostas —
+            isso cancela o risco dessa moeda e isola uma aposta &quot;limpa&quot; nas outras
+            duas (ex: comprar EUR/USD + vender EUR/NZD protege o EUR e vira, na prática, uma
+            aposta em NZD vs USD). Direção pelo viés diário/semanal — leia o timing de entrada
+            no gráfico de 4h por conta própria (nossos dados são diários, não intradiários).
+            Heurística, não recomendação de investimento.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {entradas.map((e, i) => (
+              <li
+                key={i}
+                className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[e.conviction]}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[e.conviction]}`}
+                  >
+                    {e.conviction}
+                  </span>
+                  <p className={`font-medium ${CONVICTION_TEXT[e.conviction]}`}>
+                    {e.legs[0].action} {e.legs[0].pair} + {e.legs[1].action} {e.legs[1].pair}
+                  </p>
+                  {e.trendConsistent && (
+                    <span
+                      title="Viés diário e semanal concordam na moeda sintética"
+                      className="text-amber-500"
+                    >
+                      ★
+                    </span>
+                  )}
+                </div>
+                <p className={`mt-1 text-xs opacity-70 ${CONVICTION_TEXT[e.conviction]}`}>
+                  Protege {e.hedgedCurrency} · aposta sintética: {e.syntheticView}
+                </p>
+                <p className={`mt-1 opacity-90 ${CONVICTION_TEXT[e.conviction]}`}>{e.rationale}</p>
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </div>
