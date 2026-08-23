@@ -20,6 +20,9 @@ export interface TensionIndex {
   topCorrelationBreak: CorrelationShift | null;
   topFlowNode: FlowNode | null;
   nextEvent: (CalendarEvent & { daysUntil: number }) | null;
+  // Pra montar o grid "Semana em números" na home.
+  forteIdeasCount: number;
+  totalIdeasCount: number;
 }
 
 // Índice único (0-100) sintetizando as 4 abas do app numa manchete só — a "marca" do Radar
@@ -88,5 +91,7 @@ export async function getTensionIndex(): Promise<TensionIndex> {
     topCorrelationBreak,
     topFlowNode,
     nextEvent,
+    forteIdeasCount: ideas.filter((i) => i.conviction === "forte").length,
+    totalIdeasCount: ideas.length,
   };
 }

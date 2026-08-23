@@ -1,4 +1,3 @@
-import { getMentionsTrend, getMentionsHeadline } from "@/lib/mentions";
 import { getTensionIndex } from "@/lib/tensionIndex";
 import { getFearGreedIndex } from "@/lib/sources/fearGreed";
 import { FLOW_SYMBOLS } from "@/lib/sources/flowSymbols";
@@ -41,18 +40,23 @@ const FEAR_GREED_LABEL: Record<string, string> = {
   "Extreme Greed": "Ganância extrema",
 };
 
+function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-black dark:text-zinc-50">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-zinc-500">{sub}</p>}
+    </div>
+  );
+}
+
 export default async function Home() {
-  let mentions: Awaited<ReturnType<typeof getMentionsTrend>> = [];
   let tension: Awaited<ReturnType<typeof getTensionIndex>> | null = null;
   let fearGreed: Awaited<ReturnType<typeof getFearGreedIndex>> = null;
   let error: string | null = null;
 
   try {
-    [mentions, tension, fearGreed] = await Promise.all([
-      getMentionsTrend(),
-      getTensionIndex(),
-      getFearGreedIndex(),
-    ]);
+    [tension, fearGreed] = await Promise.all([getTensionIndex(), getFearGreedIndex()]);
   } catch (e) {
     error = (e as Error).message;
   }
@@ -92,36 +96,6 @@ export default async function Home() {
             <p className={`mt-2 text-sm font-medium ${TENSION_STYLE[tension.level]}`}>
               Tensão {tension.level}: {tension.headline}
             </p>
-
-            <div className="mt-4 grid grid-cols-1 gap-2 border-t border-zinc-100 pt-3 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400 sm:grid-cols-2">
-              {tension.topForexIdea && (
-                <p>
-                  <span className="font-medium text-zinc-500">Forex:</span>{" "}
-                  {tension.topForexIdea.title}
-                </p>
-              )}
-              {tension.topCorrelationBreak && (
-                <p>
-                  <span className="font-medium text-zinc-500">Correlação:</span>{" "}
-                  {FLOW_LABEL[tension.topCorrelationBreak.a]} × {FLOW_LABEL[tension.topCorrelationBreak.b]}
-                  {(tension.topCorrelationBreak.shift ?? 0) > 0.2 ? " (quebrando)" : " (estável)"}
-                </p>
-              )}
-              {tension.topFlowNode && (
-                <p>
-                  <span className="font-medium text-zinc-500">Fluxo:</span> {tension.topFlowNode.label}{" "}
-                  {tension.topFlowNode.weeklyChangePct >= 0 ? "+" : ""}
-                  {tension.topFlowNode.weeklyChangePct.toFixed(2)}% na semana
-                </p>
-              )}
-              {tension.nextEvent && (
-                <p>
-                  <span className="font-medium text-zinc-500">Próximo evento:</span>{" "}
-                  {tension.nextEvent.title} em {tension.nextEvent.daysUntil} dia
-                  {tension.nextEvent.daysUntil !== 1 ? "s" : ""}
-                </p>
-              )}
-            </div>
           </div>
         )}
 
@@ -149,48 +123,43 @@ export default async function Home() {
           </div>
         )}
 
-        {!error && mentions.length > 0 && (
-          <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-xs font-medium text-zinc-500">
-              Radar de menções — qual narrativa está ganhando força essa semana
-            </p>
-            <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-              {getMentionsHeadline(mentions)}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {mentions.slice(0, 12).map((m) => (
-                <span
-                  key={m.tag}
-                  title={m.exampleTitles[0]}
-                  className={
-                    m.changePct !== null && m.changePct > 30
-                      ? "rounded bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:bg-red-950 dark:text-red-300"
-                      : "rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                  }
-                >
-                  #{m.tag} {m.thisWeek}
-                  {m.changePct !== null && (m.changePct > 0 ? ` +${m.changePct.toFixed(0)}%` : ` ${m.changePct.toFixed(0)}%`)}
-                </span>
-              ))}
+        {tension && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-medium text-zinc-500">Semana em números</p>
+            <div className="grid grid-cols-2 gap-2">
+              <StatTile
+                label="Maior movimento"
+                value={
+                  tension.topFlowNode
+                    ? `${tension.topFlowNode.label} ${tension.topFlowNode.weeklyChangePct >= 0 ? "+" : ""}${tension.topFlowNode.weeklyChangePct.toFixed(1)}%`
+                    : "—"
+                }
+                sub="no Mapa de Fluxo, na semana"
+              />
+              <StatTile
+                label="Ideias fortes"
+                value={`${tension.forteIdeasCount} de ${tension.totalIdeasCount}`}
+                sub="convicção forte no Forex"
+              />
+              <StatTile
+                label="Maior quebra"
+                value={
+                  tension.topCorrelationBreak
+                    ? `${FLOW_LABEL[tension.topCorrelationBreak.a]} × ${FLOW_LABEL[tension.topCorrelationBreak.b]}`
+                    : "—"
+                }
+                sub={
+                  tension.topCorrelationBreak
+                    ? `shift ${(tension.topCorrelationBreak.shift ?? 0).toFixed(2)}`
+                    : "sem dado"
+                }
+              />
+              <StatTile
+                label="Próximo evento"
+                value={tension.nextEvent ? `${tension.nextEvent.daysUntil}d` : "—"}
+                sub={tension.nextEvent?.title}
+              />
             </div>
-
-            <div className="mt-3 space-y-1.5 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-              {mentions.slice(0, 3).map(
-                (m) =>
-                  m.exampleTitles.length > 0 && (
-                    <p key={m.tag} className="text-xs text-zinc-500">
-                      <span className="font-medium text-zinc-600 dark:text-zinc-400">
-                        Por que &quot;{m.tag}&quot;:
-                      </span>{" "}
-                      &quot;{m.exampleTitles[0]}&quot;
-                    </p>
-                  )
-              )}
-            </div>
-            <p className="mt-2 text-[11px] text-zinc-400">
-              Baseado em RSS + títulos de vídeo do YouTube — não puxamos Google Trends nem X
-              (API paga/instável sem chave).
-            </p>
           </div>
         )}
       </main>

@@ -3,6 +3,9 @@
 export const FLOW_SYMBOLS = [
   { symbol: "DXY", yahoo: "DX-Y.NYB", label: "Dólar (DXY)" },
   { symbol: "GOLD", yahoo: "GC=F", label: "Ouro" },
+  { symbol: "SILVER", yahoo: "SI=F", label: "Prata" },
+  { symbol: "COPPER", yahoo: "HG=F", label: "Cobre" },
+  { symbol: "COMMOD", yahoo: "DBC", label: "Commodities (DBC)" },
   { symbol: "US10Y", yahoo: "^TNX", label: "Treasury 10Y (yield)" },
   { symbol: "BTC", yahoo: "BTC-USD", label: "Bitcoin" },
   { symbol: "SPX", yahoo: "^GSPC", label: "S&P 500" },

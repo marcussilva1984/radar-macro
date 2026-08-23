@@ -3,6 +3,12 @@ import { getTrackRecordStats } from "@/lib/trackRecord";
 
 export const dynamic = "force-dynamic";
 
+function formatClose(label: string, value: number): string {
+  const formatted = value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  if (label.includes("yield")) return `${formatted}%`;
+  return formatted;
+}
+
 export default async function FluxoPage() {
   let nodes: Awaited<ReturnType<typeof getFlowMap>> = [];
   let track: Awaited<ReturnType<typeof getTrackRecordStats>> | null = null;
@@ -20,8 +26,10 @@ export default async function FluxoPage() {
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Mapa de Fluxo</h1>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Pra onde o dinheiro migrou na semana — moedas, ouro, treasuries, BTC e S&amp;P na mesma
-        régua de comparação, do que mais subiu ao que mais caiu.
+        Pra onde o dinheiro migrou na semana — moedas, ouro, prata, cobre, commodities (DBC),
+        treasuries, BTC, S&amp;P, Dólar (DXY) e Dólar Amplo (Fed) na mesma régua de comparação,
+        do que mais subiu ao que mais caiu. DXY é dominado por EUR/JPY (~72%); o Dólar Amplo usa
+        uma cesta bem maior (Fed, inclui emergentes) — compare os dois quando divergirem.
       </p>
 
       {error && (
@@ -37,8 +45,13 @@ export default async function FluxoPage() {
             const positive = n.weeklyChangePct >= 0;
             return (
               <li key={n.label} className="flex items-center gap-3 text-sm">
-                <span className="w-14 shrink-0 text-right font-mono text-zinc-600 dark:text-zinc-400">
+                <span className="w-24 shrink-0 text-right font-mono text-xs text-zinc-600 dark:text-zinc-400">
                   {n.label}
+                  {n.latestClose !== null && (
+                    <span className="block text-[10px] text-zinc-400">
+                      {formatClose(n.label, n.latestClose)}
+                    </span>
+                  )}
                 </span>
                 <div className="relative h-5 flex-1 rounded bg-zinc-100 dark:bg-zinc-900">
                   <div className="absolute left-1/2 top-0 h-full w-px bg-zinc-300 dark:bg-zinc-700" />

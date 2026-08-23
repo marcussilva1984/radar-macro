@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { flowSeries } from "@/lib/db/schema";
 import { FLOW_SYMBOLS } from "@/lib/sources/flowSymbols";
 import { fetchDailyCloses } from "@/lib/sources/yahoo";
+import { FRED_INDICES, fetchFredSeries } from "@/lib/sources/fredIndices";
 
 export const maxDuration = 60;
 
@@ -29,6 +30,28 @@ export async function GET(req: Request) {
             close: closes[i].close,
             changePct,
           })
+          .onConflictDoUpdate({
+            target: [flowSeries.symbol, flowSeries.date],
+            set: { close: closes[i].close, changePct },
+          });
+        inserted++;
+      }
+      results[symbol] = inserted;
+    } catch (err) {
+      results[symbol] = `erro: ${(err as Error).message}`;
+    }
+  }
+
+  for (const { symbol, seriesId } of FRED_INDICES) {
+    try {
+      const closes = await fetchFredSeries(seriesId, 10);
+      let inserted = 0;
+      for (let i = 0; i < closes.length; i++) {
+        const prev = closes[i - 1];
+        const changePct = prev ? ((closes[i].close - prev.close) / prev.close) * 100 : null;
+        await db
+          .insert(flowSeries)
+          .values({ symbol, date: closes[i].date, close: closes[i].close, changePct })
           .onConflictDoUpdate({
             target: [flowSeries.symbol, flowSeries.date],
             set: { close: closes[i].close, changePct },
