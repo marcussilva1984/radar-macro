@@ -13,7 +13,10 @@ function getClient() {
     throw new Error("DATABASE_URL não configurada — veja .env.example");
   }
   if (!global.__radarMacroSql) {
-    global.__radarMacroSql = postgres(url, { max: 5 });
+    // prepare:false é obrigatório no modo transaction do pooler do Supabase (PgBouncer não
+    // suporta prepared statements entre conexões) — sem isso, queries falham de forma
+    // intermitente e confusa dependendo de qual conexão do pool atende a query.
+    global.__radarMacroSql = postgres(url, { max: 3, prepare: false });
   }
   return global.__radarMacroSql;
 }

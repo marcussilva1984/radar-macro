@@ -34,3 +34,18 @@ export function getUpcomingEvents(daysAhead = 7): CalendarEvent[] {
     return d >= now && d <= until;
   }).sort((a, b) => a.date.localeCompare(b.date));
 }
+
+// O próximo evento conhecido, sem limite de janela — pra mostrar "faltam N dias" na home
+// mesmo quando não há nada dentro dos próximos 7 dias.
+export function getNextEvent(): (CalendarEvent & { daysUntil: number }) | null {
+  const now = new Date();
+  const upcoming = KNOWN_EVENTS.filter((e) => new Date(`${e.date}T12:00:00Z`) >= now).sort((a, b) =>
+    a.date.localeCompare(b.date)
+  );
+  if (upcoming.length === 0) return null;
+  const next = upcoming[0];
+  const daysUntil = Math.ceil(
+    (new Date(`${next.date}T12:00:00Z`).getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+  );
+  return { ...next, daysUntil };
+}
