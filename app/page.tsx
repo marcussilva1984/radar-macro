@@ -1,5 +1,7 @@
 import { getRecentTimeline } from "@/lib/timeline";
 
+export const dynamic = "force-dynamic";
+
 const CATEGORY_LABEL: Record<string, string> = {
   central_bank: "Banco Central",
   geopolitics: "Geopolítica",

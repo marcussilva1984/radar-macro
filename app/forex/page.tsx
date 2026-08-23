@@ -1,6 +1,8 @@
 import { getForexBoard } from "@/lib/forex";
 import { POLICY_RATES_UPDATED_AT } from "@/lib/sources/policyRates";
 
+export const dynamic = "force-dynamic";
+
 const SIGNAL_STYLE: Record<string, string> = {
   alta: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300",
   queda: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",

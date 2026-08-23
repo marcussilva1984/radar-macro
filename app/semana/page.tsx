@@ -1,5 +1,7 @@
 import { getLatestWeeklySummary } from "@/lib/weeklySummary";
 
+export const dynamic = "force-dynamic";
+
 export default async function SemanaPage() {
   let summary: Awaited<ReturnType<typeof getLatestWeeklySummary>> | null = null;
   let error: string | null = null;

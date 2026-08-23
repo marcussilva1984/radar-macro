@@ -1,6 +1,8 @@
 import { getRecentVideos } from "@/lib/videos";
 import { isYoutubeConnected } from "@/lib/sources/googleAuth";
 
+export const dynamic = "force-dynamic";
+
 function VideoRow({ v }: { v: { videoId: string; channelTitle: string; title: string; publishedAt: Date } }) {
   return (
     <li className="rounded border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">

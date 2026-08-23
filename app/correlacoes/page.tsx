@@ -1,6 +1,8 @@
 import { getCorrelationShifts } from "@/lib/correlations";
 import { FLOW_SYMBOLS } from "@/lib/sources/flowSymbols";
 
+export const dynamic = "force-dynamic";
+
 const LABEL = Object.fromEntries(FLOW_SYMBOLS.map((s) => [s.symbol, s.label]));
 
 export default async function CorrelacoesPage() {
