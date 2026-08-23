@@ -8,10 +8,13 @@ export interface MentionTrend {
   thisWeek: number;
   lastWeek: number;
   changePct: number | null; // null quando lastWeek=0 (não dá pra calcular % de zero)
+  exampleTitles: string[]; // 2-3 títulos reais que geraram a contagem — o "porquê" da menção
 }
 
-// Temas contados nas menções — mistura ativos específicos (o que "está sendo procurado")
-// com os temas macro/geopolíticos já rastreados. \b evita falso positivo em substring.
+// Temas contados nas menções. Além dos macro/geopolíticos, inclui jargão específico de
+// finanças (debasement, dedolarização, QE, yield curve etc) que canal especializado usa mas
+// notícia geral não — sem isso, temas como "debasement" ficavam invisíveis. \b evita falso
+// positivo em substring.
 const MENTION_TOPICS: Array<{ label: string; pattern: RegExp }> = [
   { label: "bitcoin", pattern: /\bbitcoin\b/i },
   { label: "ethereum", pattern: /\bethereum\b/i },
@@ -28,6 +31,15 @@ const MENTION_TOPICS: Array<{ label: string; pattern: RegExp }> = [
   { label: "china", pattern: /\bchina\b/i },
   { label: "irã", pattern: /\biran\b|\birã\b/i },
   { label: "ucrânia/rússia", pattern: /\bukraine\b|\brussia\b|\bucrânia\b|\brússia\b/i },
+  // jargão específico de finanças/macro — tema da semana citado ("debasement") entra aqui
+  { label: "debasement", pattern: /\bdebasement\b|\bdesvalorização da moeda\b/i },
+  { label: "dedolarização", pattern: /\bde-?dollariz|\bdedolariz/i },
+  { label: "quantitative easing", pattern: /\bquantitative easing\b|\bqe\b/i },
+  { label: "yield curve", pattern: /\byield curve\b|\bcurva de juros\b/i },
+  { label: "hard assets", pattern: /\bhard assets?\b|\bativos reais\b/i },
+  { label: "stablecoin", pattern: /\bstablecoin/i },
+  { label: "dxy/dólar", pattern: /\bdxy\b|\bdollar index\b|\bíndice do dólar\b/i },
+  { label: "treasuries", pattern: /\btreasur(y|ies)\b/i },
 ];
 
 // Cruza duas fontes: os eventos RSS (poucos, mas curados) e os títulos dos vídeos do YouTube
@@ -44,12 +56,18 @@ export async function getMentionsTrend(): Promise<MentionTrend[]> {
   const titles = [...events, ...videos];
   const thisWeekCounts = new Map<string, number>();
   const lastWeekCounts = new Map<string, number>();
+  const examples = new Map<string, string[]>();
 
   for (const row of titles) {
     const bucket = row.publishedAt >= weekAgo ? thisWeekCounts : lastWeekCounts;
     for (const { label, pattern } of MENTION_TOPICS) {
       if (pattern.test(row.title)) {
         bucket.set(label, (bucket.get(label) ?? 0) + 1);
+        if (row.publishedAt >= weekAgo) {
+          const list = examples.get(label) ?? [];
+          if (list.length < 3 && !list.includes(row.title)) list.push(row.title);
+          examples.set(label, list);
+        }
       }
     }
   }
@@ -58,14 +76,16 @@ export async function getMentionsTrend(): Promise<MentionTrend[]> {
     const thisWeek = thisWeekCounts.get(label) ?? 0;
     const lastWeek = lastWeekCounts.get(label) ?? 0;
     const changePct = lastWeek > 0 ? ((thisWeek - lastWeek) / lastWeek) * 100 : null;
-    return { tag: label, thisWeek, lastWeek, changePct };
+    return { tag: label, thisWeek, lastWeek, changePct, exampleTitles: examples.get(label) ?? [] };
   })
     .filter((t) => t.thisWeek > 0 || t.lastWeek > 0)
     .sort((a, b) => b.thisWeek - a.thisWeek);
 }
 
 // Frase de interpretação — os números sozinhos ("#war 1") não dizem nada pra quem não olha
-// todo dia; isso traduz em português o que o padrão significa.
+// todo dia; isso traduz em português o que o padrão significa. Não puxamos Google Trends nem X
+// (ambos exigem API paga ou instável sem autenticação) — a leitura vem de RSS + títulos de
+// vídeo, que já reage rápido ao que está em alta online.
 export function getMentionsHeadline(mentions: MentionTrend[]): string {
   if (mentions.length === 0) {
     return "Nenhum tema relevante identificado nos eventos e vídeos dessa semana.";

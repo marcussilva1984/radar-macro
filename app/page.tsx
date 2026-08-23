@@ -161,6 +161,7 @@ export default async function Home() {
               {mentions.slice(0, 12).map((m) => (
                 <span
                   key={m.tag}
+                  title={m.exampleTitles[0]}
                   className={
                     m.changePct !== null && m.changePct > 30
                       ? "rounded bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:bg-red-950 dark:text-red-300"
@@ -172,6 +173,24 @@ export default async function Home() {
                 </span>
               ))}
             </div>
+
+            <div className="mt-3 space-y-1.5 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              {mentions.slice(0, 3).map(
+                (m) =>
+                  m.exampleTitles.length > 0 && (
+                    <p key={m.tag} className="text-xs text-zinc-500">
+                      <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                        Por que &quot;{m.tag}&quot;:
+                      </span>{" "}
+                      &quot;{m.exampleTitles[0]}&quot;
+                    </p>
+                  )
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-400">
+              Baseado em RSS + títulos de vídeo do YouTube — não puxamos Google Trends nem X
+              (API paga/instável sem chave).
+            </p>
           </div>
         )}
       </main>
