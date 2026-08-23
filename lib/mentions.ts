@@ -42,3 +42,26 @@ export async function getMentionsTrend(): Promise<MentionTrend[]> {
     .filter((t) => t.thisWeek > 0 || t.lastWeek > 0)
     .sort((a, b) => b.thisWeek - a.thisWeek);
 }
+
+// Frase de interpretação — os números sozinhos ("#war 1") não dizem nada pra quem não olha
+// todo dia; isso traduz em português o que o padrão significa.
+export function getMentionsHeadline(mentions: MentionTrend[]): string {
+  if (mentions.length === 0) {
+    return "Nenhum tema geopolítico/macro relevante identificado nos eventos dessa semana.";
+  }
+
+  const totalThisWeek = mentions.reduce((acc, m) => acc + m.thisWeek, 0);
+  const top = mentions[0];
+
+  if (totalThisWeek < 5) {
+    return `Poucos eventos rastreados essa semana (${totalThisWeek} no total) — narrativa fragmentada, sem tema claramente dominante ainda.`;
+  }
+
+  if (top.changePct !== null && top.changePct > 30) {
+    return `"${top.tag}" domina a semana: ${top.thisWeek} menções, alta de ${top.changePct.toFixed(0)}% vs. semana passada — narrativa ganhando força rápido.`;
+  }
+  if (top.lastWeek === 0 && top.thisWeek >= 2) {
+    return `"${top.tag}" surgiu essa semana (${top.thisWeek} menções, nada na semana passada) — tema novo entrando no radar.`;
+  }
+  return `"${top.tag}" segue como tema mais citado (${top.thisWeek} menções), sem mudança brusca de intensidade vs. semana passada.`;
+}

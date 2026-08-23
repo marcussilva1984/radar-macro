@@ -29,6 +29,24 @@ export const EVENT_FEEDS: Array<{
     category: "geopolitics",
     country: "GLOBAL",
   },
+  {
+    sourceName: "aljazeera-all",
+    url: "https://www.aljazeera.com/xml/rss/all.xml",
+    category: "geopolitics",
+    country: "GLOBAL",
+  },
+  {
+    sourceName: "guardian-world",
+    url: "https://www.theguardian.com/world/rss",
+    category: "geopolitics",
+    country: "GLOBAL",
+  },
+  {
+    sourceName: "dw-world",
+    url: "https://rss.dw.com/xml/rss-en-world",
+    category: "geopolitics",
+    country: "GLOBAL",
+  },
 ];
 
 // Fora do MVP por enquanto: BCB não tem RSS público funcional (site é SPA, API retorna 400
@@ -48,6 +66,9 @@ export const GEOPOLITICS_KEYWORDS = [
   "ceasefire",
   "invasion",
   "conflict",
+  "nuclear",
+  "coup",
+  "missile",
 ];
 
 // A maioria dos itens do feed geral do Fed é ação regulatória (enforcement action contra banco

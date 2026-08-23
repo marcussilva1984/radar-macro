@@ -1,17 +1,11 @@
-import { getRecentTimeline } from "@/lib/timeline";
-import { getMentionsTrend } from "@/lib/mentions";
+import { getMentionsTrend, getMentionsHeadline } from "@/lib/mentions";
 import { getTensionIndex } from "@/lib/tensionIndex";
+import { getFearGreedIndex } from "@/lib/sources/fearGreed";
 import { FLOW_SYMBOLS } from "@/lib/sources/flowSymbols";
 
 export const dynamic = "force-dynamic";
 
 const FLOW_LABEL = Object.fromEntries(FLOW_SYMBOLS.map((s) => [s.symbol, s.label]));
-
-const CATEGORY_LABEL: Record<string, string> = {
-  central_bank: "Banco Central",
-  geopolitics: "Geopolítica",
-  macro_data: "Dado Macro",
-};
 
 const TENSION_STYLE: Record<string, string> = {
   alta: "text-red-600 dark:text-red-400",
@@ -24,93 +18,43 @@ const TENSION_BAR: Record<string, string> = {
   baixa: "bg-green-500",
 };
 
-const VISIBLE_EVENTS = 8;
+// Cor por faixa do índice de medo/ganância (0-100): vermelho = medo extremo, verde = ganância extrema.
+function fearGreedColor(value: number): string {
+  if (value <= 24) return "text-red-600 dark:text-red-400";
+  if (value <= 44) return "text-orange-500 dark:text-orange-400";
+  if (value <= 55) return "text-zinc-500 dark:text-zinc-400";
+  if (value <= 75) return "text-lime-600 dark:text-lime-400";
+  return "text-green-600 dark:text-green-400";
+}
+function fearGreedBar(value: number): string {
+  if (value <= 24) return "bg-red-500";
+  if (value <= 44) return "bg-orange-500";
+  if (value <= 55) return "bg-zinc-400";
+  if (value <= 75) return "bg-lime-500";
+  return "bg-green-500";
+}
+const FEAR_GREED_LABEL: Record<string, string> = {
+  "Extreme Fear": "Medo extremo",
+  Fear: "Medo",
+  Neutral: "Neutro",
+  Greed: "Ganância",
+  "Extreme Greed": "Ganância extrema",
+};
 
 export default async function Home() {
-  let entries: Awaited<ReturnType<typeof getRecentTimeline>> = [];
   let mentions: Awaited<ReturnType<typeof getMentionsTrend>> = [];
   let tension: Awaited<ReturnType<typeof getTensionIndex>> | null = null;
+  let fearGreed: Awaited<ReturnType<typeof getFearGreedIndex>> = null;
   let error: string | null = null;
 
   try {
-    [entries, mentions, tension] = await Promise.all([
-      getRecentTimeline(14),
+    [mentions, tension, fearGreed] = await Promise.all([
       getMentionsTrend(),
       getTensionIndex(),
+      getFearGreedIndex(),
     ]);
   } catch (e) {
     error = (e as Error).message;
-  }
-
-  // Ordena por relevância (maior |surpresa| entre os ativos que reagiram), não por hora —
-  // o que mais moveu o mercado aparece primeiro, cronologia vira critério secundário.
-  const ranked = [...entries].sort((a, b) => {
-    const maxA = Math.max(0, ...a.moves.map((m) => Math.abs(m.surprise ?? 0)));
-    const maxB = Math.max(0, ...b.moves.map((m) => Math.abs(m.surprise ?? 0)));
-    if (maxA !== maxB) return maxB - maxA;
-    return b.publishedAt.getTime() - a.publishedAt.getTime();
-  });
-  const visible = ranked.slice(0, VISIBLE_EVENTS);
-  const rest = ranked.slice(VISIBLE_EVENTS);
-
-  function renderEvent(e: (typeof ranked)[number]) {
-    return (
-      <li
-        key={e.id}
-        className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
-      >
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <span className="rounded bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
-            {CATEGORY_LABEL[e.category] ?? e.category}
-          </span>
-          <span>{e.country}</span>
-          <span>{e.publishedAt.toLocaleString("pt-BR")}</span>
-          {e.duplicateCount > 0 && (
-            <span title="Mesmo assunto noticiado por outras fontes, agrupado aqui">
-              +{e.duplicateCount} fonte{e.duplicateCount > 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-        <a
-          href={e.sourceUrl ?? "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1 block font-medium text-black hover:underline dark:text-zinc-50"
-        >
-          {e.title}
-        </a>
-        {e.tags.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {e.tags.map((t) => (
-              <span
-                key={t}
-                className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-              >
-                #{t}
-              </span>
-            ))}
-          </div>
-        )}
-        {e.moves.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            {e.moves.map((m) => (
-              <span
-                key={m.symbol}
-                title={m.surprise !== null ? `z-score: ${m.surprise.toFixed(1)}` : undefined}
-                className={
-                  (m.changePct ?? 0) >= 0
-                    ? "rounded bg-green-50 px-1.5 py-0.5 text-green-700 dark:bg-green-950 dark:text-green-300"
-                    : "rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-950 dark:text-red-300"
-                }
-              >
-                {m.label} {m.changePct?.toFixed(2)}%
-                {m.surprise !== null && Math.abs(m.surprise) > 1.5 ? " ⚡" : ""}
-              </span>
-            ))}
-          </div>
-        )}
-      </li>
-    );
   }
 
   return (
@@ -119,8 +63,8 @@ export default async function Home() {
         <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Radar Semanal</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Foco: EUA (Fed, política, comércio), macroeconomia, geopolítica, criptoativos e bancos
-          centrais — o que moveu os ativos de fluxo (DXY, ouro, treasuries, BTC, S&amp;P) no dia
-          seguinte.
+          centrais — leitura de fluxo e narrativa, não notícia crua (isso já tem no Terminal de
+          Mercado).
         </p>
 
         {error && (
@@ -181,10 +125,37 @@ export default async function Home() {
           </div>
         )}
 
+        {fearGreed && (
+          <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-zinc-500">Medo &amp; Ganância (cripto)</p>
+              <span className={`text-2xl font-bold ${fearGreedColor(fearGreed.value)}`}>
+                {fearGreed.value}
+                <span className="text-sm font-normal opacity-60">/100</span>
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full rounded bg-zinc-100 dark:bg-zinc-800">
+              <div
+                className={`h-2 rounded ${fearGreedBar(fearGreed.value)}`}
+                style={{ width: `${fearGreed.value}%` }}
+              />
+            </div>
+            <p className={`mt-2 text-sm font-medium ${fearGreedColor(fearGreed.value)}`}>
+              {FEAR_GREED_LABEL[fearGreed.classification] ?? fearGreed.classification}
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Fonte: alternative.me · atualizado {fearGreed.timestamp.toLocaleDateString("pt-BR")}
+            </p>
+          </div>
+        )}
+
         {!error && mentions.length > 0 && (
           <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <p className="text-xs font-medium text-zinc-500">
               Radar de menções — qual narrativa está ganhando força essa semana
+            </p>
+            <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+              {getMentionsHeadline(mentions)}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {mentions.slice(0, 12).map((m) => (
@@ -202,24 +173,6 @@ export default async function Home() {
               ))}
             </div>
           </div>
-        )}
-
-        {!error && entries.length === 0 && (
-          <p className="mt-8 text-sm text-zinc-500">
-            Nenhum evento ainda. Rode <code>/api/cron/ingest-events</code> e{" "}
-            <code>/api/cron/ingest-flows</code> para popular.
-          </p>
-        )}
-
-        <ul className="mt-8 space-y-4">{visible.map(renderEvent)}</ul>
-
-        {rest.length > 0 && (
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm text-zinc-500 hover:text-black dark:hover:text-zinc-50">
-              Ver mais {rest.length} evento{rest.length > 1 ? "s" : ""} de menor relevância
-            </summary>
-            <ul className="mt-4 space-y-4">{rest.map(renderEvent)}</ul>
-          </details>
         )}
       </main>
     </div>
