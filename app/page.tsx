@@ -1,6 +1,13 @@
 import { getRecentTimeline } from "@/lib/timeline";
+import { GEOPOLITICS_KEYWORDS } from "@/lib/sources/rssEvents";
+import { RELEVANCE_KEYWORDS } from "@/lib/sources/youtubeChannels";
+import { TopicRequestForm } from "@/app/components/TopicRequestForm";
 
 export const dynamic = "force-dynamic";
+
+// União dos temas já rastreados pelas duas fontes (RSS de geopolítica + filtro de vídeos),
+// sem duplicar — é a lista que aparece como "radar atual" na home.
+const TRACKED_TOPICS = [...new Set([...GEOPOLITICS_KEYWORDS, ...RELEVANCE_KEYWORDS.map((k) => k.replace(/\\b/g, ""))])];
 
 const CATEGORY_LABEL: Record<string, string> = {
   central_bank: "Banco Central",
@@ -21,11 +28,28 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Radar Macro</h1>
+        <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Radar Semanal</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Timeline: eventos macro/geopolíticos e como os ativos de fluxo (DXY, ouro, treasuries,
-          BTC, S&amp;P) reagiram no dia seguinte.
+          Eventos macro/geopolíticos e como os ativos de fluxo (DXY, ouro, treasuries, BTC, S&amp;P)
+          reagiram no dia seguinte.
         </p>
+
+        <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-xs font-medium text-zinc-500">
+            Temas rastreados agora ({TRACKED_TOPICS.length})
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {TRACKED_TOPICS.map((t) => (
+              <span
+                key={t}
+                className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+          <TopicRequestForm />
+        </div>
 
         {error && (
           <div className="mt-8 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">

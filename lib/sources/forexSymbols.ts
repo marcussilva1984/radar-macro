@@ -16,6 +16,7 @@ export const FX_PAIRS = [
   { pair: "GBPNZD", yahoo: "GBPNZD=X", base: "GBP", quote: "NZD" },
   { pair: "EURAUD", yahoo: "EURAUD=X", base: "EUR", quote: "AUD" },
   { pair: "EURNZD", yahoo: "EURNZD=X", base: "EUR", quote: "NZD" },
+  { pair: "AUDNZD", yahoo: "AUDNZD=X", base: "AUD", quote: "NZD" },
 ] as const;
 
 export type FxPair = (typeof FX_PAIRS)[number]["pair"];
@@ -36,4 +37,13 @@ export const TRIANGULATIONS: Array<{ cross: FxPair; legA: FxPair; legB: FxPair; 
   { cross: "GBPNZD", legA: "GBPUSD", legB: "NZDUSD", op: "subtract" },
   { cross: "EURAUD", legA: "EURUSD", legB: "AUDUSD", op: "subtract" },
   { cross: "EURNZD", legA: "EURUSD", legB: "NZDUSD", op: "subtract" },
+  { cross: "AUDNZD", legA: "AUDUSD", legB: "NZDUSD", op: "subtract" },
+];
+
+// Pares que compartilham a moeda base e cuja quote (AUD/NZD) é historicamente muito
+// correlacionada — a lógica por trás de "se EUR/AUD já caiu bastante e AUD~NZD andam juntas,
+// tem espaço pra EUR/NZD seguir na mesma direção". Usado pra gerar as "ideias" na aba Forex.
+export const LINKED_CROSS_PAIRS: Array<{ a: FxPair; b: FxPair; via: [FxCurrency, FxCurrency] }> = [
+  { a: "EURAUD", b: "EURNZD", via: ["AUD", "NZD"] },
+  { a: "GBPAUD", b: "GBPNZD", via: ["AUD", "NZD"] },
 ];

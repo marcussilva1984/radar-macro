@@ -69,6 +69,14 @@ export const youtubeAuth = pgTable("youtube_auth", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Temas que você pediu pra rastrear além dos já cobertos — vira sugestão de expansão do
+// radar (GEOPOLITICS_KEYWORDS / RELEVANCE_KEYWORDS), revisada manualmente.
+export const topicRequests = pgTable("topic_requests", {
+  id: serial("id").primaryKey(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Resumo semanal gerado (Fase 1: texto simples a partir dos eventos de maior "surpresa").
 export const weeklySummaries = pgTable(
   "weekly_summaries",

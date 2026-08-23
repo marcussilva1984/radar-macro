@@ -15,6 +15,13 @@
       "when": 1787441632386,
       "tag": "0001_sticky_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787446011216,
+      "tag": "0002_easy_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

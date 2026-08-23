@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db/client";
 import { weeklySummaries } from "@/lib/db/schema";
 import { getRecentTimeline } from "@/lib/timeline";
+import { getUpcomingEvents } from "@/lib/sources/economicCalendar";
 import { desc } from "drizzle-orm";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -44,8 +45,21 @@ export async function generateWeeklySummary(): Promise<string> {
   return `Destaques da semana (maiores desvios vs. padrão histórico dos ativos de fluxo):\n\n${lines.join("\n")}`;
 }
 
+// Seção "o que esperar" — eventos macro já conhecidos com antecedência (calendário manual),
+// não descoberta via RSS (que só pega o que já aconteceu).
+export function generateUpcomingSection(): string {
+  const upcoming = getUpcomingEvents(7);
+  if (upcoming.length === 0) {
+    return "Sem eventos macro relevantes conhecidos pra próxima semana (calendário manual — pode haver falas de banco central não agendadas com antecedência).";
+  }
+  const lines = upcoming.map((e) => `- ${e.date} [${e.country}] ${e.title}`);
+  return `O que esperar na próxima semana:\n\n${lines.join("\n")}`;
+}
+
 export async function saveWeeklySummary(): Promise<string> {
-  const summary = await generateWeeklySummary();
+  const recap = await generateWeeklySummary();
+  const upcoming = generateUpcomingSection();
+  const summary = `${recap}\n\n---\n\n${upcoming}`;
   const weekStart = new Date();
   weekStart.setUTCHours(0, 0, 0, 0);
   weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay()); // domingo da semana atual
@@ -61,4 +75,9 @@ export async function saveWeeklySummary(): Promise<string> {
 export async function getLatestWeeklySummary() {
   const [row] = await db.select().from(weeklySummaries).orderBy(desc(weeklySummaries.weekStart)).limit(1);
   return row ?? null;
+}
+
+// Semana atual + anterior, pra comparar "o que rolou" com "o que a gente esperava".
+export async function getLastTwoWeeklySummaries() {
+  return db.select().from(weeklySummaries).orderBy(desc(weeklySummaries.weekStart)).limit(2);
 }
