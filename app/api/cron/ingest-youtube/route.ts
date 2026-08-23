@@ -8,7 +8,7 @@ import {
   type YoutubeVideoHit,
 } from "@/lib/sources/youtube";
 import { isYoutubeConnected, getAuthenticatedClient } from "@/lib/sources/googleAuth";
-import { YOUTUBE_SEARCH_TOPICS } from "@/lib/sources/youtubeChannels";
+import { YOUTUBE_SEARCH_TOPICS, isRelevantTitle } from "@/lib/sources/youtubeChannels";
 import { mapWithConcurrency } from "@/lib/concurrency";
 
 export const maxDuration = 60;
@@ -51,9 +51,12 @@ export async function GET(req: Request) {
   try {
     const subs = await fetchMySubscriptions(client);
     followedIds = new Set(subs.map((s) => s.channelId));
-    const videos = await fetchRecentVideosFromSubscriptions(client, subs);
+    const allVideos = await fetchRecentVideosFromSubscriptions(client, subs);
+    // Com centenas de inscrições, sem esse filtro a lista vira "tudo que você assiste"
+    // (futebol, vlog, etc) em vez de só o que interessa ao Radar Macro.
+    const videos = allVideos.filter((v) => isRelevantTitle(v.title));
     const inserted = await insertVideos(videos, { subscribed: true });
-    results["subscriptions"] = `${subs.length} canais, ${inserted} vídeos novos`;
+    results["subscriptions"] = `${subs.length} canais, ${allVideos.length} vídeos, ${inserted} relevantes`;
   } catch (err) {
     results["subscriptions"] = `erro: ${(err as Error).message}`;
   }
