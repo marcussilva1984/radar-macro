@@ -23,24 +23,24 @@ export const TRUSTED_BR_CHANNELS = ["igor mundstock", "renauld adorno", "renaud 
 // palavra (evita "pib" casar em "impibecável" etc).
 export const RELEVANCE_KEYWORDS = [
   // macroeconomia / bancos centrais
-  "fed\\b", "powell", "federal reserve", "fomc", "central bank",
-  "banco central", "selic", "juros", "inflaç", "inflation", "pib\\b", "gdp\\b",
+  "\\bfed\\b", "powell", "federal reserve", "fomc", "central bank",
+  "banco central", "selic", "juros", "inflaç", "inflation", "\\bpib\\b", "\\bgdp\\b",
   "recessão", "recession", "macroeconomi", "treasury", "interest rate",
   // câmbio / forex
-  "dólar", "dollar", "câmbio", "forex", "currency",
+  "dólar", "dollar", "câmbio", "\\bforex\\b", "currency",
   // criptoativos
   "bitcoin", "cripto", "crypto", "ethereum", "blockchain", "altcoin", "web3",
   // geopolítica
-  "geopolít", "geopolit", "guerra", "war\\b", "ucrânia", "ukraine", "rússia", "russia",
-  "china", "taiwan", "irã", "iran", "israel", "middle east", "oriente médio",
-  "petróleo", "oil\\b", "opep", "opec", "tarifa", "tariff", "sanç", "sanction",
+  "geopolít", "geopolit", "guerra", "\\bwar\\b", "ucrânia", "ukraine", "rússia", "russia",
+  "china", "taiwan", "\\birã\\b", "\\biran\\b", "israel", "middle east", "oriente médio",
+  "petróleo", "\\boil\\b", "opep", "opec", "tarifa", "tariff", "sanç", "sanction",
 ];
 
 // Ruído de política doméstica brasileira que costuma bater em keywords genéricas
 // ("economia", "juros") sem ser sobre macro/geopolítica de fato — filtrado, exceto pros
 // canais de TRUSTED_BR_CHANNELS.
 const EXCLUDE_KEYWORDS = [
-  "lula", "bolsonaro", "datafolha", "eleiç", "election\\b",
+  "lula", "bolsonaro", "datafolha", "eleiç", "\\belection\\b",
   "renan santos", "pablo marçal", "flávio bolsonaro", "moraes", "\\bstf\\b",
 ];
 
