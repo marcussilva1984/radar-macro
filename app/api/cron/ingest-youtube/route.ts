@@ -5,11 +5,34 @@ import {
   fetchMySubscriptions,
   fetchRecentVideosFromSubscriptions,
   searchRecentVideos,
+  type YoutubeVideoHit,
 } from "@/lib/sources/youtube";
 import { isYoutubeConnected, getAuthenticatedClient } from "@/lib/sources/googleAuth";
 import { YOUTUBE_SEARCH_TOPICS } from "@/lib/sources/youtubeChannels";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 export const maxDuration = 60;
+
+async function insertVideos(
+  videos: YoutubeVideoHit[],
+  opts: { subscribed: boolean; matchedTags?: string[] } | ((v: YoutubeVideoHit) => { subscribed: boolean; matchedTags: string[] })
+) {
+  if (videos.length === 0) return 0;
+  const rows = videos.map((v) => {
+    const o = typeof opts === "function" ? opts(v) : opts;
+    return {
+      videoId: v.videoId,
+      channelId: v.channelId,
+      channelTitle: v.channelTitle,
+      title: v.title,
+      matchedTags: o.matchedTags ?? [],
+      subscribed: o.subscribed,
+      publishedAt: v.publishedAt,
+    };
+  });
+  await db.insert(youtubeVideos).values(rows).onConflictDoNothing({ target: youtubeVideos.videoId });
+  return rows.length;
+}
 
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
@@ -29,51 +52,29 @@ export async function GET(req: Request) {
     const subs = await fetchMySubscriptions(client);
     followedIds = new Set(subs.map((s) => s.channelId));
     const videos = await fetchRecentVideosFromSubscriptions(client, subs);
-    let inserted = 0;
-    for (const v of videos) {
-      await db
-        .insert(youtubeVideos)
-        .values({
-          videoId: v.videoId,
-          channelId: v.channelId,
-          channelTitle: v.channelTitle,
-          title: v.title,
-          matchedTags: [],
-          subscribed: true,
-          publishedAt: v.publishedAt,
-        })
-        .onConflictDoNothing({ target: youtubeVideos.videoId });
-      inserted++;
-    }
+    const inserted = await insertVideos(videos, { subscribed: true });
     results["subscriptions"] = `${subs.length} canais, ${inserted} vídeos novos`;
   } catch (err) {
     results["subscriptions"] = `erro: ${(err as Error).message}`;
   }
 
   // 2. Vídeos relevantes por tema, de qualquer canal (alerta de "não segue mas pode interessar").
-  for (const topic of YOUTUBE_SEARCH_TOPICS) {
+  // Em paralelo (limitado) — vários temas em sequência facilmente estoura o timeout de 60s.
+  const topicResults = await mapWithConcurrency(YOUTUBE_SEARCH_TOPICS, 4, async (topic) => {
     try {
       const videos = await searchRecentVideos(client, topic);
-      let inserted = 0;
-      for (const v of videos) {
-        await db
-          .insert(youtubeVideos)
-          .values({
-            videoId: v.videoId,
-            channelId: v.channelId,
-            channelTitle: v.channelTitle,
-            title: v.title,
-            matchedTags: [topic],
-            subscribed: followedIds.has(v.channelId),
-            publishedAt: v.publishedAt,
-          })
-          .onConflictDoNothing({ target: youtubeVideos.videoId });
-        inserted++;
-      }
-      results[`topic:${topic}`] = inserted;
+      const inserted = await insertVideos(videos, (v) => ({
+        subscribed: followedIds.has(v.channelId),
+        matchedTags: [topic],
+      }));
+      return { topic, inserted };
     } catch (err) {
-      results[`topic:${topic}`] = `erro: ${(err as Error).message}`;
+      return { topic, error: (err as Error).message };
     }
+  });
+
+  for (const r of topicResults) {
+    results[`topic:${r.topic}`] = "error" in r ? `erro: ${r.error}` : r.inserted;
   }
 
   return NextResponse.json({ ok: true, results });

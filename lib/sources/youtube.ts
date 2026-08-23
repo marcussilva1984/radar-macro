@@ -1,6 +1,7 @@
 import "server-only";
 import { google, youtube_v3 } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 export interface YoutubeVideoHit {
   videoId: string;
@@ -76,33 +77,38 @@ export async function fetchRecentVideosFromSubscriptions(
   );
   const since = Date.now() - hours * 60 * 60 * 1000;
   const titleByChannel = new Map(channels.map((c) => [c.channelId, c.channelTitle]));
-  const hits: YoutubeVideoHit[] = [];
+  const entries = [...uploadsByChannel.entries()];
 
-  for (const [channelId, playlistId] of uploadsByChannel) {
+  // Muitos canais inscritos = muitas chamadas de rede; em paralelo (limitado) pra caber
+  // no timeout de 60s da function (Vercel Hobby), em vez de 1 request por vez.
+  const perChannel = await mapWithConcurrency(entries, 10, async ([channelId, playlistId]) => {
     try {
       const res = await client.playlistItems.list({
         part: ["snippet"],
         playlistId,
         maxResults: 5,
       });
-      for (const item of res.data.items ?? []) {
-        const publishedAt = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt) : null;
-        const videoId = item.snippet?.resourceId?.videoId;
-        if (!publishedAt || !videoId || publishedAt.getTime() < since) continue;
-        hits.push({
-          videoId,
-          channelId,
-          channelTitle: titleByChannel.get(channelId) ?? item.snippet?.channelTitle ?? "",
-          title: item.snippet?.title ?? "(sem título)",
-          publishedAt,
-        });
-      }
+      return (res.data.items ?? [])
+        .map((item) => {
+          const publishedAt = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt) : null;
+          const videoId = item.snippet?.resourceId?.videoId;
+          if (!publishedAt || !videoId || publishedAt.getTime() < since) return null;
+          return {
+            videoId,
+            channelId,
+            channelTitle: titleByChannel.get(channelId) ?? item.snippet?.channelTitle ?? "",
+            title: item.snippet?.title ?? "(sem título)",
+            publishedAt,
+          };
+        })
+        .filter((h): h is YoutubeVideoHit => h !== null);
     } catch {
       // canal pode ter uploads privados/desativados — ignora e segue os demais
+      return [];
     }
-  }
+  });
 
-  return hits;
+  return perChannel.flat();
 }
 
 // Busca por tema, pra achar vídeos relevantes mesmo em canais que você não segue.
