@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     const allVideos = await fetchRecentVideosFromSubscriptions(client, subs);
     // Com centenas de inscrições, sem esse filtro a lista vira "tudo que você assiste"
     // (futebol, vlog, etc) em vez de só o que interessa ao Radar Macro.
-    const videos = allVideos.filter((v) => isRelevantTitle(v.title));
+    const videos = allVideos.filter((v) => isRelevantTitle(v.title, v.channelTitle));
     const inserted = await insertVideos(videos, { subscribed: true });
     results["subscriptions"] = `${subs.length} canais, ${allVideos.length} vídeos, ${inserted} relevantes`;
   } catch (err) {
@@ -65,7 +65,8 @@ export async function GET(req: Request) {
   // Em paralelo (limitado) — vários temas em sequência facilmente estoura o timeout de 60s.
   const topicResults = await mapWithConcurrency(YOUTUBE_SEARCH_TOPICS, 4, async (topic) => {
     try {
-      const videos = await searchRecentVideos(client, topic);
+      const allVideos = await searchRecentVideos(client, topic);
+      const videos = allVideos.filter((v) => isRelevantTitle(v.title, v.channelTitle));
       const inserted = await insertVideos(videos, (v) => ({
         subscribed: followedIds.has(v.channelId),
         matchedTags: [topic],

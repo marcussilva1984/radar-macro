@@ -33,10 +33,19 @@ export interface FxPairSignal {
   trendConsistent: boolean; // diário e semanal apontam na mesma direção
 }
 
+export type Conviction = "forte" | "médio" | "fraco";
+
 export interface TradeIdea {
   title: string;
   detail: string;
   pairs: FxPair[];
+  conviction: Conviction;
+}
+
+function convictionOf(absScore: number): Conviction {
+  if (absScore >= 0.35) return "forte";
+  if (absScore >= SIGNAL_THRESHOLD) return "médio";
+  return "fraco";
 }
 
 async function getSeriesBySymbol(days: number): Promise<Map<string, Array<{ date: Date; changePct: number }>>> {
@@ -86,6 +95,8 @@ export function computeCurrencyStrength(changes: Map<FxPair, number>): CurrencyS
 const SIGNAL_THRESHOLD = 0.15;
 const TREND_THRESHOLD = 0.1;
 
+const MIN_IDEAS = 10;
+
 function buildTradeIdeas(
   signals: FxPairSignal[],
   audNzdCorr: number | null
@@ -95,52 +106,78 @@ function buildTradeIdeas(
 
   // 1. Tendência consistente (diário e semanal concordam) — o sinal mais "seguro" de continuação.
   const consistent = signals.filter((s) => s.trendConsistent && s.signal !== "estabilização");
-  for (const s of consistent.slice(0, 3)) {
+  for (const s of consistent) {
     ideas.push({
       title: `${s.base}/${s.quote}: ${s.signal} consistente (diário e semanal)`,
       detail: `Variação diária ${s.changePct?.toFixed(2)}% e semanal ${s.weeklyChangePct?.toFixed(2)}% na mesma direção — não é só ruído de um dia.`,
       pairs: [s.pair],
+      conviction: convictionOf(Math.abs(s.score)),
     });
   }
 
-  // 2. Pares "linkados" pela correlação AUD/NZD: se um já mostra tendência forte, o espelho
-  // (mesma base, quote correlacionada) tende a seguir o mesmo caminho com um delay.
+  // 2. Pares "linkados" pela correlação AUD/NZD: se um já mostra tendência clara ("esticado")
+  // e o outro ainda não acompanhou (ou moveu bem menos), há espaço pra convergirem — mesma
+  // lógica de "AUD/USD esticado, NZD/USD tem espaço pra seguir" pedida.
   if (audNzdCorr !== null && Math.abs(audNzdCorr) > 0.5) {
     for (const { a, b } of LINKED_CROSS_PAIRS) {
       const sigA = byPair.get(a);
       const sigB = byPair.get(b);
-      if (!sigA || !sigB) continue;
-      if (sigA.signal === "estabilização" || sigA.signal === sigB.signal) continue;
-      // sigA já tendencia claro, sigB ainda não acompanhou — possível assimetria a se fechar.
+      if (!sigA || !sigB || sigA.signal === "estabilização") continue;
+      const bLagging = sigB.signal !== sigA.signal || Math.abs(sigB.score) < Math.abs(sigA.score) * 0.5;
+      if (!bLagging) continue;
       ideas.push({
-        title: `${sigA.base}/${sigA.quote} já em ${sigA.signal}, ${sigB.base}/${sigB.quote} ainda não acompanhou`,
+        title: `${sigA.base}/${sigA.quote} esticado em ${sigA.signal}, ${sigB.base}/${sigB.quote} ainda não acompanhou`,
         detail: `AUD e NZD historicamente correlacionadas (r=${audNzdCorr.toFixed(2)} nos últimos 30 dias) — se ${sigA.base}/${sigA.quote} segue em ${sigA.signal}, há espaço pra ${sigB.base}/${sigB.quote} convergir na mesma direção, especialmente se o diferencial de juros não mudar.`,
         pairs: [a, b],
+        conviction: convictionOf(Math.abs(sigA.score)),
       });
     }
   }
 
-  // 3. Hedge cross-asset: junto de uma ideia de queda numa moeda, sugere uma posição oposta
-  // numa moeda "seca" (não correlacionada com a primeira ideia) pra não ficar 100% exposto
-  // ao mesmo tema (ex: só EUR fraco). Pega o sinal mais forte que não compartilha moeda com a 1a ideia.
-  if (ideas.length > 0) {
-    const mainCurrencies = new Set(ideas[0].pairs.flatMap((p) => {
-      const s = byPair.get(p);
-      return s ? [s.base, s.quote] : [];
-    }));
+  // 3. Hedge cross-asset: pra cada ideia forte, sugere uma posição numa moeda "seca" (não
+  // compartilha moeda com ela) — não fica 100% exposto ao mesmo tema (ex: só EUR fraco).
+  const strongIdeas = ideas.filter((i) => i.conviction === "forte").slice(0, 3);
+  for (const idea of strongIdeas) {
+    const mainCurrencies = new Set(
+      idea.pairs.flatMap((p) => {
+        const s = byPair.get(p);
+        return s ? [s.base, s.quote] : [];
+      })
+    );
     const hedgeCandidate = signals.find(
-      (s) => s.trendConsistent && !mainCurrencies.has(s.base) && !mainCurrencies.has(s.quote)
+      (s) =>
+        s.trendConsistent &&
+        !mainCurrencies.has(s.base) &&
+        !mainCurrencies.has(s.quote) &&
+        !ideas.some((i) => i.pairs.includes(s.pair) && i.title.startsWith("Hedge"))
     );
     if (hedgeCandidate) {
       ideas.push({
         title: `Hedge sugerido: ${hedgeCandidate.base}/${hedgeCandidate.quote} (${hedgeCandidate.signal})`,
-        detail: `Não compartilha moeda com a ideia principal — serve pra não concentrar a aposta numa moeda só.`,
+        detail: `Não compartilha moeda com "${idea.title}" — serve pra não concentrar a aposta numa moeda só.`,
         pairs: [hedgeCandidate.pair],
+        conviction: convictionOf(Math.abs(hedgeCandidate.score)),
       });
     }
   }
 
-  return ideas;
+  // 4. Se ainda não chegou no mínimo de ideias, completa com os pares de maior |score|
+  // que ainda não apareceram (convicção mais fraca, mas ainda informativo).
+  const usedPairs = new Set(ideas.flatMap((i) => i.pairs));
+  for (const s of signals) {
+    if (ideas.length >= MIN_IDEAS) break;
+    if (usedPairs.has(s.pair) || s.signal === "estabilização") continue;
+    ideas.push({
+      title: `${s.base}/${s.quote}: viés de ${s.signal}`,
+      detail: `Força relativa ${s.strengthDiff?.toFixed(2) ?? "—"} e carry ${s.carryDiff.toFixed(2)}pp apontam ${s.signal}, mas sem confirmação diário+semanal ainda — convicção menor.`,
+      pairs: [s.pair],
+      conviction: convictionOf(Math.abs(s.score)),
+    });
+    usedPairs.add(s.pair);
+  }
+
+  const order: Record<Conviction, number> = { forte: 0, médio: 1, fraco: 2 };
+  return ideas.sort((a, b) => order[a.conviction] - order[b.conviction]);
 }
 
 export async function getForexBoard(): Promise<{

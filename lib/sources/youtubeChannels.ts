@@ -1,37 +1,60 @@
 // Termos usados pra buscar vídeos novos sobre os temas do Radar Macro, mesmo em canais
-// que você não segue (vira alerta separado na aba /videos). Foco: economia, macroeconomia,
-// geopolítica e criptoativos — nacional + internacional.
+// que você não segue (vira alerta separado na aba /videos). Foco internacional: geopolítica,
+// macroeconomia, finanças e forex — cripto também, mas política/notícia doméstica do Brasil
+// fica de fora (ver EXCLUDE_KEYWORDS).
 export const YOUTUBE_SEARCH_TOPICS = [
-  "Federal Reserve Powell juros",
-  "banco central Brasil Selic",
-  "geopolítica economia mundial",
-  "guerra sanções economia global",
-  "OPEP petróleo preço",
-  "bitcoin criptomoedas mercado",
-  "dólar câmbio economia Brasil",
-  "China EUA tensão comercial",
+  "Federal Reserve Powell interest rates",
+  "global macroeconomics outlook",
+  "geopolitics world economy",
+  "war sanctions economy global",
+  "OPEC oil price",
+  "bitcoin crypto market macro",
+  "forex dollar currency outlook",
+  "China US trade tension",
 ];
+
+// Canais brasileiros que você realmente quer ver, mesmo focando em conteúdo internacional —
+// esses passam direto, sem aplicar o filtro de exclusão de política doméstica. Ajuste os
+// termos conforme o nome exato do canal no YouTube (casamento por substring, case-insensitive).
+export const TRUSTED_BR_CHANNELS = ["igor mundstock", "renauld adorno", "renaud adorno", "omnimacro", "omni macro"];
 
 // Filtro de relevância pros vídeos dos canais que VOCÊ segue — sem isso, com centenas de
-// inscrições, a lista vira "tudo que você assiste" (futebol, vlog, etc) em vez de só economia,
-// macroeconomia, geopolítica e criptoativos. \b garante limite de palavra (evita "pib" casar em
-// "impibecável" etc).
+// inscrições, a lista vira "tudo que você assiste" (futebol, vlog, etc). \b garante limite de
+// palavra (evita "pib" casar em "impibecável" etc).
 export const RELEVANCE_KEYWORDS = [
   // macroeconomia / bancos centrais
-  "fed\\b", "powell", "federal reserve", "fomc",
-  "banco central", "selic", "juros", "inflaç", "pib\\b", "recessão", "recession",
-  "economia", "macroeconomi", "treasury",
+  "fed\\b", "powell", "federal reserve", "fomc", "central bank",
+  "banco central", "selic", "juros", "inflaç", "inflation", "pib\\b", "gdp\\b",
+  "recessão", "recession", "macroeconomi", "treasury", "interest rate",
   // câmbio / forex
-  "dólar", "câmbio", "forex",
+  "dólar", "dollar", "câmbio", "forex", "currency",
   // criptoativos
-  "bitcoin", "cripto", "ethereum", "blockchain", "altcoin", "web3",
+  "bitcoin", "cripto", "crypto", "ethereum", "blockchain", "altcoin", "web3",
   // geopolítica
   "geopolít", "geopolit", "guerra", "war\\b", "ucrânia", "ukraine", "rússia", "russia",
-  "china", "taiwan", "irã", "iran", "israel", "oriente médio",
-  "petróleo", "opep", "tarifa", "sanç", "sanction", "tariff",
+  "china", "taiwan", "irã", "iran", "israel", "middle east", "oriente médio",
+  "petróleo", "oil\\b", "opep", "opec", "tarifa", "tariff", "sanç", "sanction",
 ];
 
-export function isRelevantTitle(title: string): boolean {
+// Ruído de política doméstica brasileira que costuma bater em keywords genéricas
+// ("economia", "juros") sem ser sobre macro/geopolítica de fato — filtrado, exceto pros
+// canais de TRUSTED_BR_CHANNELS.
+const EXCLUDE_KEYWORDS = [
+  "lula", "bolsonaro", "datafolha", "eleiç", "election\\b",
+  "renan santos", "pablo marçal", "flávio bolsonaro", "moraes", "\\bstf\\b",
+];
+
+function matches(list: string[], lower: string): boolean {
+  return list.some((kw) => new RegExp(kw, "i").test(lower));
+}
+
+export function isTrustedBrChannel(channelTitle: string): boolean {
+  const lower = channelTitle.toLowerCase();
+  return TRUSTED_BR_CHANNELS.some((c) => lower.includes(c));
+}
+
+export function isRelevantTitle(title: string, channelTitle = ""): boolean {
+  if (isTrustedBrChannel(channelTitle)) return true;
   const lower = title.toLowerCase();
-  return RELEVANCE_KEYWORDS.some((kw) => new RegExp(kw, "i").test(lower));
+  return matches(RELEVANCE_KEYWORDS, lower) && !matches(EXCLUDE_KEYWORDS, lower);
 }

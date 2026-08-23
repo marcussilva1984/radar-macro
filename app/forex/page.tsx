@@ -9,6 +9,23 @@ const SIGNAL_STYLE: Record<string, string> = {
   estabilização: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
 };
 
+// forte = vermelho (chama mais atenção), médio = amarelo, fraco = azul/neutro.
+const CONVICTION_STYLE: Record<string, string> = {
+  forte: "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950",
+  médio: "border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950",
+  fraco: "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950",
+};
+const CONVICTION_BADGE: Record<string, string> = {
+  forte: "bg-red-600 text-white",
+  médio: "bg-yellow-500 text-black",
+  fraco: "bg-blue-500 text-white",
+};
+const CONVICTION_TEXT: Record<string, string> = {
+  forte: "text-red-900 dark:text-red-200",
+  médio: "text-yellow-900 dark:text-yellow-200",
+  fraco: "text-blue-900 dark:text-blue-200",
+};
+
 function changeColor(v: number | null) {
   if (v === null) return "text-zinc-400";
   return v >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
@@ -60,14 +77,27 @@ export default async function ForexPage() {
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
             Ideias da semana
           </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Convicção: <span className="font-medium text-red-600 dark:text-red-400">forte</span> ·{" "}
+            <span className="font-medium text-yellow-600 dark:text-yellow-500">médio</span> ·{" "}
+            <span className="font-medium text-blue-600 dark:text-blue-400">fraco</span> — quanto
+            mais forte, mais os sinais (força, carry, assimetria, tendência) concordam entre si.
+          </p>
           <ul className="mt-3 space-y-2">
             {ideas.map((idea, i) => (
               <li
                 key={i}
-                className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-900 dark:bg-blue-950"
+                className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[idea.conviction]}`}
               >
-                <p className="font-medium text-blue-900 dark:text-blue-200">{idea.title}</p>
-                <p className="mt-1 text-blue-800/80 dark:text-blue-300/80">{idea.detail}</p>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[idea.conviction]}`}
+                  >
+                    {idea.conviction}
+                  </span>
+                  <p className={`font-medium ${CONVICTION_TEXT[idea.conviction]}`}>{idea.title}</p>
+                </div>
+                <p className={`mt-1 opacity-80 ${CONVICTION_TEXT[idea.conviction]}`}>{idea.detail}</p>
               </li>
             ))}
           </ul>

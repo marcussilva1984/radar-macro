@@ -46,4 +46,6 @@ export const TRIANGULATIONS: Array<{ cross: FxPair; legA: FxPair; legB: FxPair; 
 export const LINKED_CROSS_PAIRS: Array<{ a: FxPair; b: FxPair; via: [FxCurrency, FxCurrency] }> = [
   { a: "EURAUD", b: "EURNZD", via: ["AUD", "NZD"] },
   { a: "GBPAUD", b: "GBPNZD", via: ["AUD", "NZD"] },
+  { a: "AUDUSD", b: "NZDUSD", via: ["AUD", "NZD"] },
+  { a: "AUDCHF", b: "NZDCHF", via: ["AUD", "NZD"] },
 ];
