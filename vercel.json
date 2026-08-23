@@ -4,6 +4,7 @@
     { "path": "/api/cron/ingest-flows", "schedule": "0 22 * * *" },
     { "path": "/api/cron/ingest-forex", "schedule": "0 22 * * *" },
     { "path": "/api/cron/ingest-youtube", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/weekly-summary", "schedule": "0 12 * * 5" }
+    { "path": "/api/cron/weekly-summary", "schedule": "0 12 * * 5" },
+    { "path": "/api/cron/track-record", "schedule": "0 13 * * 5" }
   ]
 }

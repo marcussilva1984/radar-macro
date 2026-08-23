@@ -1,13 +1,7 @@
 import { getRecentTimeline } from "@/lib/timeline";
-import { GEOPOLITICS_KEYWORDS } from "@/lib/sources/rssEvents";
-import { RELEVANCE_KEYWORDS } from "@/lib/sources/youtubeChannels";
-import { TopicRequestForm } from "@/app/components/TopicRequestForm";
+import { getMentionsTrend } from "@/lib/mentions";
 
 export const dynamic = "force-dynamic";
-
-// União dos temas já rastreados pelas duas fontes (RSS de geopolítica + filtro de vídeos),
-// sem duplicar — é a lista que aparece como "radar atual" na home.
-const TRACKED_TOPICS = [...new Set([...GEOPOLITICS_KEYWORDS, ...RELEVANCE_KEYWORDS.map((k) => k.replace(/\\b/g, ""))])];
 
 const CATEGORY_LABEL: Record<string, string> = {
   central_bank: "Banco Central",
@@ -17,10 +11,11 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export default async function Home() {
   let entries: Awaited<ReturnType<typeof getRecentTimeline>> = [];
+  let mentions: Awaited<ReturnType<typeof getMentionsTrend>> = [];
   let error: string | null = null;
 
   try {
-    entries = await getRecentTimeline(14);
+    [entries, mentions] = await Promise.all([getRecentTimeline(14), getMentionsTrend()]);
   } catch (e) {
     error = (e as Error).message;
   }
@@ -30,31 +25,38 @@ export default async function Home() {
       <main className="mx-auto max-w-3xl px-6 py-12">
         <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Radar Semanal</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Eventos macro/geopolíticos e como os ativos de fluxo (DXY, ouro, treasuries, BTC, S&amp;P)
-          reagiram no dia seguinte.
+          Foco: EUA (Fed, política, comércio), macroeconomia, geopolítica, criptoativos e bancos
+          centrais — o que moveu os ativos de fluxo (DXY, ouro, treasuries, BTC, S&amp;P) no dia
+          seguinte.
         </p>
-
-        <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-          <p className="text-xs font-medium text-zinc-500">
-            Temas rastreados agora ({TRACKED_TOPICS.length})
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {TRACKED_TOPICS.map((t) => (
-              <span
-                key={t}
-                className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-          <TopicRequestForm />
-        </div>
 
         {error && (
           <div className="mt-8 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
             Configure <code>DATABASE_URL</code> em <code>.env.local</code> e rode os crons de
             ingestão para ver dados aqui. ({error})
+          </div>
+        )}
+
+        {!error && mentions.length > 0 && (
+          <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <p className="text-xs font-medium text-zinc-500">
+              Radar de menções — qual narrativa está ganhando força essa semana
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {mentions.slice(0, 12).map((m) => (
+                <span
+                  key={m.tag}
+                  className={
+                    m.changePct !== null && m.changePct > 30
+                      ? "rounded bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:bg-red-950 dark:text-red-300"
+                      : "rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                  }
+                >
+                  #{m.tag} {m.thisWeek}
+                  {m.changePct !== null && (m.changePct > 0 ? ` +${m.changePct.toFixed(0)}%` : ` ${m.changePct.toFixed(0)}%`)}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 

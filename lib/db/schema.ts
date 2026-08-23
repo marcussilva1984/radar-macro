@@ -69,14 +69,6 @@ export const youtubeAuth = pgTable("youtube_auth", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Temas que você pediu pra rastrear além dos já cobertos — vira sugestão de expansão do
-// radar (GEOPOLITICS_KEYWORDS / RELEVANCE_KEYWORDS), revisada manualmente.
-export const topicRequests = pgTable("topic_requests", {
-  id: serial("id").primaryKey(),
-  text: text("text").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 // Resumo semanal gerado (Fase 1: texto simples a partir dos eventos de maior "surpresa").
 export const weeklySummaries = pgTable(
   "weekly_summaries",
@@ -87,4 +79,23 @@ export const weeklySummaries = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("weekly_summaries_week_start_idx").on(t.weekStart)]
+);
+
+// Snapshot semanal das ideias de Forex, pra depois checar se o par realmente foi na direção
+// apontada (track record — transforma a heurística num histórico verificável).
+export const ideaSnapshots = pgTable(
+  "idea_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    pair: text("pair").notNull(),
+    signal: text("signal").notNull(), // 'alta' | 'queda'
+    conviction: text("conviction").notNull(), // 'forte' | 'médio' | 'fraco'
+    score: doublePrecision("score").notNull(),
+    closeAtSnapshot: doublePrecision("close_at_snapshot").notNull(),
+    outcome: text("outcome"), // null até avaliar; depois 'acerto' | 'erro'
+    actualChangePct: doublePrecision("actual_change_pct"),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idea_snapshots_created_at_idx").on(t.createdAt)]
 );

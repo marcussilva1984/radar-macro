@@ -22,6 +22,13 @@
       "when": 1787446011216,
       "tag": "0002_easy_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787450252437,
+      "tag": "0003_drop_topic_requests_add_idea_snapshots",
+      "breakpoints": true
     }
   ]
 }
