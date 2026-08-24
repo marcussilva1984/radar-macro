@@ -1,12 +1,15 @@
-name: Ingest YouTube 3x/day (Telegram alerts)
+name: Ingest YouTube 4x/day (Telegram alerts)
 
 on:
   schedule:
-    # 09:00, 15:00, 21:00 horário de Brasília (UTC-3) — manhã, tarde, noite, cobrindo lives
-    # em horários diferentes. Vercel Hobby só permite cron 1x/dia, por isso GitHub Actions.
-    - cron: "0 12 * * *"
-    - cron: "0 18 * * *"
-    - cron: "0 0 * * *"
+    # A cada 6h (04h/10h/16h/22h BRT) — mais frequente que 3x/dia sem estourar a cota
+    # gratuita da YouTube Data API (10.000 unidades/dia; cada rodada gasta ~1.800 com 938
+    # canais + buscas por tema, então de hora em hora estouraria rápido). Vercel Hobby só
+    # permite cron nativo 1x/dia, por isso GitHub Actions aqui.
+    - cron: "0 7 * * *"
+    - cron: "0 13 * * *"
+    - cron: "0 19 * * *"
+    - cron: "0 1 * * *"
   workflow_dispatch: {}
 
 jobs:
