@@ -86,9 +86,10 @@ export async function GET(req: Request) {
     allRelevantVideos.push(...r.videos);
   }
 
-  // Alerta no Telegram com todos os vídeos relevantes, agrupados por cor de convicção — não
-  // pré-filtramos, você decide o que importa. Limita por nível pra não virar spam.
-  let telegramSent = false;
+  // Alerta no Telegram com TODOS os vídeos relevantes, agrupados por cor de convicção — sem
+  // limite por nível (você decide o que importa, não o app). Telegram limita ~4096 char por
+  // mensagem, então quebra em várias mensagens numeradas quando precisa.
+  let telegramMessagesSent = 0;
   try {
     const seen = new Set<string>();
     const unique = allRelevantVideos.filter((v) => {
@@ -98,25 +99,40 @@ export async function GET(req: Request) {
     });
 
     const EMOJI = { forte: "🔴", médio: "🟡", fraco: "🔵" } as const;
-    const LIMIT = { forte: 8, médio: 5, fraco: 3 } as const;
-    const sections: string[] = [];
-
+    const lines: string[] = [];
     for (const level of ["forte", "médio", "fraco"] as const) {
-      const videos = unique.filter((v) => classifyVideoImportance(v.title) === level).slice(0, LIMIT[level]);
+      const videos = unique.filter((v) => classifyVideoImportance(v.title) === level);
       if (videos.length === 0) continue;
-      const lines = videos.map(
-        (v) => `${EMOJI[level]} <b>${v.title}</b>\n${v.channelTitle} — https://www.youtube.com/watch?v=${v.videoId}`
-      );
-      sections.push(`<b>${level.toUpperCase()}</b>\n\n${lines.join("\n\n")}`);
+      lines.push(`<b>${level.toUpperCase()} (${videos.length})</b>`);
+      for (const v of videos) {
+        lines.push(`${EMOJI[level]} <b>${v.title}</b>\n${v.channelTitle} — https://www.youtube.com/watch?v=${v.videoId}`);
+      }
     }
 
-    if (sections.length > 0) {
-      await sendTelegramMessage(`<b>Vídeos relevantes hoje</b>\n\n${sections.join("\n\n———\n\n")}`);
-      telegramSent = true;
+    if (lines.length > 0) {
+      const MAX_CHARS = 3800; // margem de segurança sob o limite de 4096 do Telegram
+      const chunks: string[] = [];
+      let current = "";
+      for (const line of lines) {
+        const candidate = current ? `${current}\n\n${line}` : line;
+        if (candidate.length > MAX_CHARS && current) {
+          chunks.push(current);
+          current = line;
+        } else {
+          current = candidate;
+        }
+      }
+      if (current) chunks.push(current);
+
+      for (let i = 0; i < chunks.length; i++) {
+        const header = chunks.length > 1 ? `<b>Vídeos relevantes hoje (${i + 1}/${chunks.length})</b>\n\n` : `<b>Vídeos relevantes hoje</b>\n\n`;
+        await sendTelegramMessage(header + chunks[i]);
+        telegramMessagesSent++;
+      }
     }
   } catch {
     // best-effort — não quebra a ingestão se o Telegram falhar
   }
 
-  return NextResponse.json({ ok: true, results, telegramSent });
+  return NextResponse.json({ ok: true, results, telegramMessagesSent });
 }
