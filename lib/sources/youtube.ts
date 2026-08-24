@@ -111,6 +111,38 @@ export async function fetchRecentVideosFromSubscriptions(
   return perChannel.flat();
 }
 
+// PT15M33S, PT1H2M -> minutos (arredondado pra baixo). Formato ISO 8601 de duração do YouTube.
+function parseDurationToMinutes(iso: string): number {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
+  if (!match) return 0;
+  const hours = Number(match[1] ?? 0);
+  const minutes = Number(match[2] ?? 0);
+  return hours * 60 + minutes;
+}
+
+// Duração de cada vídeo — videos.list aceita até 50 ids por chamada (1 unidade de cota cada
+// batch), bem barato mesmo pra centenas de vídeos. Usado pra filtrar vídeo curto (< 20min).
+export async function fetchVideoDurationsMinutes(
+  auth: OAuth2Client,
+  videoIds: string[]
+): Promise<Map<string, number>> {
+  const client = yt(auth);
+  const map = new Map<string, number>();
+
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const batch = videoIds.slice(i, i + 50);
+    if (batch.length === 0) continue;
+    const res = await client.videos.list({ part: ["contentDetails"], id: batch, maxResults: 50 });
+    for (const item of res.data.items ?? []) {
+      if (item.id && item.contentDetails?.duration) {
+        map.set(item.id, parseDurationToMinutes(item.contentDetails.duration));
+      }
+    }
+  }
+
+  return map;
+}
+
 // Busca por tema, pra achar vídeos relevantes mesmo em canais que você não segue.
 export async function searchRecentVideos(
   auth: OAuth2Client,

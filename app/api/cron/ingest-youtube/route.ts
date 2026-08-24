@@ -5,6 +5,7 @@ import {
   fetchMySubscriptions,
   fetchRecentVideosFromSubscriptions,
   searchRecentVideos,
+  fetchVideoDurationsMinutes,
   type YoutubeVideoHit,
 } from "@/lib/sources/youtube";
 import { isYoutubeConnected, getAuthenticatedClient } from "@/lib/sources/googleAuth";
@@ -14,6 +15,8 @@ import { classifyVideoImportance } from "@/lib/videos";
 import { sendTelegramMessage } from "@/lib/telegram";
 
 export const maxDuration = 60;
+
+const MIN_DURATION_MINUTES = 20;
 
 async function insertVideos(
   videos: YoutubeVideoHit[],
@@ -47,20 +50,18 @@ export async function GET(req: Request) {
 
   const client = await getAuthenticatedClient();
   const results: Record<string, number | string> = {};
-  const allRelevantVideos: YoutubeVideoHit[] = [];
 
   // 1. Vídeos novos de todos os canais que você realmente segue (subscriptions.list).
   let followedIds = new Set<string>();
+  let subVideos: YoutubeVideoHit[] = [];
   try {
     const subs = await fetchMySubscriptions(client);
     followedIds = new Set(subs.map((s) => s.channelId));
     const allVideos = await fetchRecentVideosFromSubscriptions(client, subs);
     // Com centenas de inscrições, sem esse filtro a lista vira "tudo que você assiste"
     // (futebol, vlog, etc) em vez de só o que interessa ao Radar Macro.
-    const videos = allVideos.filter((v) => isRelevantTitle(v.title, v.channelTitle));
-    const inserted = await insertVideos(videos, { subscribed: true });
-    allRelevantVideos.push(...videos);
-    results["subscriptions"] = `${subs.length} canais, ${allVideos.length} vídeos, ${inserted} relevantes`;
+    subVideos = allVideos.filter((v) => isRelevantTitle(v.title, v.channelTitle));
+    results["subscriptions"] = `${subs.length} canais, ${allVideos.length} vídeos, ${subVideos.length} relevantes (antes do filtro de duração)`;
   } catch (err) {
     results["subscriptions"] = `erro: ${(err as Error).message}`;
   }
@@ -71,24 +72,49 @@ export async function GET(req: Request) {
     try {
       const allVideos = await searchRecentVideos(client, topic);
       const videos = allVideos.filter((v) => isRelevantTitle(v.title, v.channelTitle));
-      const inserted = await insertVideos(videos, (v) => ({
-        subscribed: followedIds.has(v.channelId),
-        matchedTags: [topic],
-      }));
-      return { topic, inserted, videos };
+      return { topic, videos };
     } catch (err) {
       return { topic, error: (err as Error).message, videos: [] as YoutubeVideoHit[] };
     }
   });
 
+  const topicVideosByTopic = new Map<string, YoutubeVideoHit[]>();
   for (const r of topicResults) {
-    results[`topic:${r.topic}`] = "error" in r ? `erro: ${r.error}` : r.inserted;
-    allRelevantVideos.push(...r.videos);
+    if ("error" in r) results[`topic:${r.topic}`] = `erro: ${r.error}`;
+    topicVideosByTopic.set(r.topic, r.videos);
   }
 
-  // Alerta no Telegram com TODOS os vídeos relevantes, agrupados por cor de convicção — sem
-  // limite por nível (você decide o que importa, não o app). Telegram limita ~4096 char por
-  // mensagem, então quebra em várias mensagens numeradas quando precisa.
+  // Filtro de duração (>= 20min, tira Shorts e clipes curtos) — videos.list em lote de 50,
+  // ~1 unidade de cota por lote, então cabe fácil no orçamento mesmo com centenas de vídeos.
+  const allTopicVideos = [...topicVideosByTopic.values()].flat();
+  const allCandidateIds = [...subVideos, ...allTopicVideos].map((v) => v.videoId);
+  let durations = new Map<string, number>();
+  try {
+    durations = await fetchVideoDurationsMinutes(client, [...new Set(allCandidateIds)]);
+  } catch (err) {
+    results["durations"] = `erro: ${(err as Error).message}`;
+  }
+  const longEnough = (v: YoutubeVideoHit) => (durations.get(v.videoId) ?? MIN_DURATION_MINUTES) >= MIN_DURATION_MINUTES;
+
+  const subVideosFiltered = subVideos.filter(longEnough);
+  const insertedSub = await insertVideos(subVideosFiltered, { subscribed: true });
+  results["subscriptions"] = `${results["subscriptions"]}, ${insertedSub} com >= ${MIN_DURATION_MINUTES}min`;
+
+  const allRelevantVideos: YoutubeVideoHit[] = [...subVideosFiltered];
+  for (const [topic, videos] of topicVideosByTopic) {
+    const filtered = videos.filter(longEnough);
+    const inserted = await insertVideos(filtered, (v) => ({
+      subscribed: followedIds.has(v.channelId),
+      matchedTags: [topic],
+    }));
+    results[`topic:${topic}`] = inserted;
+    allRelevantVideos.push(...filtered);
+  }
+
+  // Alerta no Telegram só com FORTE e MÉDIO (fraco fica de fora, mas ainda aparece no site
+  // em /videos) — reduz volume de mensagem, embora não afete a cota de ingestão em si (essa
+  // é limitada pelas chamadas de busca, não pelo que é enviado). Telegram limita ~4096 char
+  // por mensagem, então quebra em várias mensagens quando precisa.
   let telegramMessagesSent = 0;
   try {
     const seen = new Set<string>();
@@ -98,9 +124,9 @@ export async function GET(req: Request) {
       return true;
     });
 
-    const EMOJI = { forte: "🔴", médio: "🟡", fraco: "🔵" } as const;
+    const EMOJI = { forte: "🔴", médio: "🟡" } as const;
     const lines: string[] = [];
-    for (const level of ["forte", "médio", "fraco"] as const) {
+    for (const level of ["forte", "médio"] as const) {
       const videos = unique.filter((v) => classifyVideoImportance(v.title) === level);
       if (videos.length === 0) continue;
       lines.push(`<b>${level.toUpperCase()} (${videos.length})</b>`);
