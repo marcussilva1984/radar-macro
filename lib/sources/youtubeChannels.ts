@@ -44,6 +44,14 @@ const EXCLUDE_KEYWORDS = [
   "renan santos", "pablo marçal", "flávio bolsonaro", "moraes", "\\bstf\\b",
 ];
 
+// Formatos que você não quer, independente do tema — vídeo curto (short), live, entrevista,
+// podcast, debate. Isso vale SEMPRE, até pros canais de TRUSTED_BR_CHANNELS (o filtro de
+// política doméstica é que é pulado pra eles, não o de formato).
+const EXCLUDE_FORMAT_KEYWORDS = [
+  "#shorts", "\\bshorts\\b", "\\blive\\b", "\\bao vivo\\b", "livestream",
+  "\\binterview\\b", "\\bentrevista\\b", "\\bpodcast\\b", "\\bdebate\\b", "\\bq&a\\b", "\\bama\\b",
+];
+
 function matches(list: string[], lower: string): boolean {
   return list.some((kw) => new RegExp(kw, "i").test(lower));
 }
@@ -54,7 +62,8 @@ export function isTrustedBrChannel(channelTitle: string): boolean {
 }
 
 export function isRelevantTitle(title: string, channelTitle = ""): boolean {
-  if (isTrustedBrChannel(channelTitle)) return true;
   const lower = title.toLowerCase();
+  if (matches(EXCLUDE_FORMAT_KEYWORDS, lower)) return false;
+  if (isTrustedBrChannel(channelTitle)) return true;
   return matches(RELEVANCE_KEYWORDS, lower) && !matches(EXCLUDE_KEYWORDS, lower);
 }
