@@ -10,6 +10,8 @@ import {
 import { isYoutubeConnected, getAuthenticatedClient } from "@/lib/sources/googleAuth";
 import { YOUTUBE_SEARCH_TOPICS, isRelevantTitle } from "@/lib/sources/youtubeChannels";
 import { mapWithConcurrency } from "@/lib/concurrency";
+import { classifyVideoImportance } from "@/lib/videos";
+import { sendTelegramMessage } from "@/lib/telegram";
 
 export const maxDuration = 60;
 
@@ -45,6 +47,7 @@ export async function GET(req: Request) {
 
   const client = await getAuthenticatedClient();
   const results: Record<string, number | string> = {};
+  const allRelevantVideos: YoutubeVideoHit[] = [];
 
   // 1. Vídeos novos de todos os canais que você realmente segue (subscriptions.list).
   let followedIds = new Set<string>();
@@ -56,6 +59,7 @@ export async function GET(req: Request) {
     // (futebol, vlog, etc) em vez de só o que interessa ao Radar Macro.
     const videos = allVideos.filter((v) => isRelevantTitle(v.title, v.channelTitle));
     const inserted = await insertVideos(videos, { subscribed: true });
+    allRelevantVideos.push(...videos);
     results["subscriptions"] = `${subs.length} canais, ${allVideos.length} vídeos, ${inserted} relevantes`;
   } catch (err) {
     results["subscriptions"] = `erro: ${(err as Error).message}`;
@@ -71,15 +75,48 @@ export async function GET(req: Request) {
         subscribed: followedIds.has(v.channelId),
         matchedTags: [topic],
       }));
-      return { topic, inserted };
+      return { topic, inserted, videos };
     } catch (err) {
-      return { topic, error: (err as Error).message };
+      return { topic, error: (err as Error).message, videos: [] as YoutubeVideoHit[] };
     }
   });
 
   for (const r of topicResults) {
     results[`topic:${r.topic}`] = "error" in r ? `erro: ${r.error}` : r.inserted;
+    allRelevantVideos.push(...r.videos);
   }
 
-  return NextResponse.json({ ok: true, results });
+  // Alerta no Telegram com todos os vídeos relevantes, agrupados por cor de convicção — não
+  // pré-filtramos, você decide o que importa. Limita por nível pra não virar spam.
+  let telegramSent = false;
+  try {
+    const seen = new Set<string>();
+    const unique = allRelevantVideos.filter((v) => {
+      if (seen.has(v.videoId)) return false;
+      seen.add(v.videoId);
+      return true;
+    });
+
+    const EMOJI = { forte: "🔴", médio: "🟡", fraco: "🔵" } as const;
+    const LIMIT = { forte: 8, médio: 5, fraco: 3 } as const;
+    const sections: string[] = [];
+
+    for (const level of ["forte", "médio", "fraco"] as const) {
+      const videos = unique.filter((v) => classifyVideoImportance(v.title) === level).slice(0, LIMIT[level]);
+      if (videos.length === 0) continue;
+      const lines = videos.map(
+        (v) => `${EMOJI[level]} <b>${v.title}</b>\n${v.channelTitle} — https://www.youtube.com/watch?v=${v.videoId}`
+      );
+      sections.push(`<b>${level.toUpperCase()}</b>\n\n${lines.join("\n\n")}`);
+    }
+
+    if (sections.length > 0) {
+      await sendTelegramMessage(`<b>Vídeos relevantes hoje</b>\n\n${sections.join("\n\n———\n\n")}`);
+      telegramSent = true;
+    }
+  } catch {
+    // best-effort — não quebra a ingestão se o Telegram falhar
+  }
+
+  return NextResponse.json({ ok: true, results, telegramSent });
 }

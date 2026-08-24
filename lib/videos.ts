@@ -9,7 +9,7 @@ import type { Conviction } from "@/lib/forex";
 const FORTE_KEYWORDS = /\bfed\b|\bpowell\b|\bfomc\b|\bwar\b|\bguerra\b|\biran\b|\birã\b|\bukraine\b|\brussia\b|\bchina\b|\bsanction\b|\btariff\b|\brate cut\b|\binterest rate\b/i;
 const MEDIO_KEYWORDS = /\bbitcoin\b|\bcrypto\b|\bcripto\b|\bgold\b|\bouro\b|\boil\b|\bopec\b|\binflation\b|\brecession\b|\bdebasement\b/i;
 
-function classify(title: string): Conviction {
+export function classifyVideoImportance(title: string): Conviction {
   if (FORTE_KEYWORDS.test(title)) return "forte";
   if (MEDIO_KEYWORDS.test(title)) return "médio";
   return "fraco";
@@ -26,7 +26,7 @@ export async function getRecentVideos(days = 7) {
     .orderBy(desc(youtubeVideos.publishedAt))
     .limit(150);
 
-  const withConviction = rows.map((r) => ({ ...r, conviction: classify(r.title) }));
+  const withConviction = rows.map((r) => ({ ...r, conviction: classifyVideoImportance(r.title) }));
   const byImportance = (a: (typeof withConviction)[number], b: (typeof withConviction)[number]) =>
     ORDER[a.conviction] - ORDER[b.conviction] || b.publishedAt.getTime() - a.publishedAt.getTime();
 
