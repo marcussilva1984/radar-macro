@@ -1,0 +1,17 @@
+name: Ingest YouTube discover (2x/day)
+
+on:
+  schedule:
+    # Descoberta por tema (canais que você não segue) — caro em cota (~800 unid/rodada), 2x/dia.
+    - cron: "0 10 * * *"
+    - cron: "0 22 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call ingest-youtube-discover endpoint
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://radar-macro.vercel.app/api/cron/ingest-youtube-discover"

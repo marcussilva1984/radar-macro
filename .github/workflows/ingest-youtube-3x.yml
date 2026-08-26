@@ -1,22 +1,23 @@
-name: Ingest YouTube 4x/day (Telegram alerts)
+name: Ingest YouTube (subscriptions 8x/day + discover 2x/day)
 
 on:
   schedule:
-    # A cada 6h (04h/10h/16h/22h BRT) — mais frequente que 3x/dia sem estourar a cota
-    # gratuita da YouTube Data API (10.000 unidades/dia; cada rodada gasta ~1.800 com 938
-    # canais + buscas por tema, então de hora em hora estouraria rápido). Vercel Hobby só
-    # permite cron nativo 1x/dia, por isso GitHub Actions aqui.
+    # Canais que você segue — barato em cota (~980 unid/rodada), 8x/dia (a cada 3h).
+    - cron: "0 4 * * *"
     - cron: "0 7 * * *"
+    - cron: "0 10 * * *"
     - cron: "0 13 * * *"
+    - cron: "0 16 * * *"
     - cron: "0 19 * * *"
+    - cron: "0 22 * * *"
     - cron: "0 1 * * *"
   workflow_dispatch: {}
 
 jobs:
-  trigger:
+  subscriptions:
     runs-on: ubuntu-latest
     steps:
-      - name: Call ingest-youtube endpoint
+      - name: Call ingest-youtube endpoint (subscriptions)
         run: |
           curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://radar-macro.vercel.app/api/cron/ingest-youtube"
