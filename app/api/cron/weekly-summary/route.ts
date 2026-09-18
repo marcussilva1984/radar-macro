@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { saveWeeklySummary } from "@/lib/weeklySummary";
 import { getForexBoard } from "@/lib/forex";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { getB3Ideas } from "@/lib/b3Ideas";
 
 export const maxDuration = 60;
 
@@ -21,7 +22,16 @@ export async function GET(req: Request) {
       if (strong.length > 0) {
         const lines = strong.map((i) => `🔴 <b>${i.title}</b>\n${i.detail}`);
         await sendTelegramMessage(
-          `<b>Radar Macro — ideias fortes da semana</b>\n\n${lines.join("\n\n")}`
+          `<b>Radar Macro — ideias fortes da semana (Forex)</b>\n\n${lines.join("\n\n")}`
+        );
+        telegramSent = true;
+      }
+
+      const b3Strong = (await getB3Ideas()).filter((i) => i.conviction === "forte").slice(0, 12);
+      if (b3Strong.length > 0) {
+        const lines = b3Strong.map((i) => `🔴 <b>${i.title}</b>\n${i.detail}`);
+        await sendTelegramMessage(
+          `<b>Radar Macro — ideias fortes da semana (Ações e FIIs)</b>\n\n${lines.join("\n\n")}`
         );
         telegramSent = true;
       }

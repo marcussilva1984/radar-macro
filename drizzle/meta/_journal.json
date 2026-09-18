@@ -29,6 +29,13 @@
       "when": 1787450252437,
       "tag": "0003_drop_topic_requests_add_idea_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789755583495,
+      "tag": "0004_add_b3_ideas",
+      "breakpoints": true
     }
   ]
 }

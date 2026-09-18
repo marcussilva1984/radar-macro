@@ -1,4 +1,18 @@
 import { getLastTwoWeeklySummaries } from "@/lib/weeklySummary";
+import { getB3Ideas } from "@/lib/b3Ideas";
+
+const CONVICTION_STYLE: Record<string, string> = {
+  forte: "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950",
+  médio: "border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950",
+};
+const CONVICTION_BADGE: Record<string, string> = {
+  forte: "bg-red-600 text-white",
+  médio: "bg-yellow-500 text-black",
+};
+const CONVICTION_TEXT: Record<string, string> = {
+  forte: "text-red-900 dark:text-red-200",
+  médio: "text-yellow-900 dark:text-yellow-200",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +24,17 @@ export default async function SemanaPage() {
   } catch (e) {
     error = (e as Error).message;
   }
+
+  let b3: Awaited<ReturnType<typeof getB3Ideas>> = [];
+  try {
+    b3 = await getB3Ideas();
+  } catch {
+    // tabela ainda vazia/indisponível — a seção só não aparece
+  }
+  const byStrength = (a: (typeof b3)[number], b: (typeof b3)[number]) =>
+    (a.conviction === b.conviction ? 0 : a.conviction === "forte" ? -1 : 1) || Math.abs(b.score) - Math.abs(a.score);
+  const acoes = b3.filter((i) => i.kind === "acao").sort(byStrength).slice(0, 8);
+  const fiis = b3.filter((i) => i.kind === "fii").sort(byStrength).slice(0, 8);
 
   const [current, previous] = weeks;
 
@@ -55,6 +80,41 @@ export default async function SemanaPage() {
             {previous.summary}
           </pre>
         </div>
+      )}
+
+      {[
+        { title: "Ideias fortes — Ações (B3)", items: acoes },
+        { title: "Ideias fortes — FIIs", items: fiis },
+      ].map(
+        (group) =>
+          group.items.length > 0 && (
+            <section key={group.title} className="mt-10">
+              <h2 className="text-lg font-medium text-black dark:text-zinc-50">{group.title}</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Só papéis líquidos da B3. Forte = tendência diária e semanal alinhadas com fluxo
+                (força vs Ibovespa) e, nos FIIs, dividend yield + desconto da cota. Heurística de
+                leitura, não recomendação de investimento.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {group.items.map((i) => (
+                  <li
+                    key={i.id}
+                    className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[i.conviction]}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[i.conviction]}`}
+                      >
+                        {i.conviction}
+                      </span>
+                      <p className={`font-medium ${CONVICTION_TEXT[i.conviction]}`}>{i.title}</p>
+                    </div>
+                    <p className={`mt-1 opacity-80 ${CONVICTION_TEXT[i.conviction]}`}>{i.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
       )}
     </div>
   );

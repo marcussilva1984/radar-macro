@@ -99,3 +99,20 @@ export const ideaSnapshots = pgTable(
   },
   (t) => [index("idea_snapshots_created_at_idx").on(t.createdAt)]
 );
+
+// Ideias de ações/FII da B3 (última rodada do cron ingest-b3 — apagada e regravada a cada run).
+export const b3Ideas = pgTable(
+  "b3_ideas",
+  {
+    id: serial("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    kind: text("kind").notNull(), // 'acao' | 'fii'
+    signal: text("signal").notNull(), // 'alta' | 'queda'
+    conviction: text("conviction").notNull(), // 'forte' | 'médio' | 'fraco'
+    score: doublePrecision("score").notNull(),
+    title: text("title").notNull(),
+    detail: text("detail").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("b3_ideas_kind_idx").on(t.kind)]
+);
