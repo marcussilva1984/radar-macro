@@ -13,7 +13,7 @@ import {
   type VideoWithSubscription,
 } from "@/lib/videoIngestShared";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Canais que você segue de verdade (subscriptions.list) — barato em cota (~980 unidades),
 // por isso roda com mais frequência (8x/dia) que a descoberta por tema (2x/dia, mais cara).
@@ -26,10 +26,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ skipped: "YouTube não conectado — acesse /api/auth/youtube" });
   }
 
-  const client = await getAuthenticatedClient();
   const results: Record<string, number | string> = {};
 
   try {
+    // Dentro do try de propósito: token OAuth inválido/expirado (invalid_grant) lança aqui, e
+    // fora do try virava um 500 mudo, sem mensagem — foi assim que a falha ficou invisível.
+    const client = await getAuthenticatedClient();
     const subs = await fetchMySubscriptions(client);
     const allVideos = await fetchRecentVideosFromSubscriptions(client, subs);
     // Com centenas de inscrições, sem esse filtro a lista vira "tudo que você assiste"

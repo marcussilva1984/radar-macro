@@ -11,7 +11,7 @@ import {
 } from "@/lib/videoIngestShared";
 import type { YoutubeVideoHit } from "@/lib/sources/youtube";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Descoberta por tema (busca vídeos relevantes em QUALQUER canal, mesmo os que você não
 // segue) — cara em cota (search.list = 100 unid/tema, ~800/rodada), por isso roda só 2x/dia,
@@ -25,7 +25,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ skipped: "YouTube não conectado — acesse /api/auth/youtube" });
   }
 
-  const client = await getAuthenticatedClient();
+  let client: Awaited<ReturnType<typeof getAuthenticatedClient>>;
+  try {
+    client = await getAuthenticatedClient();
+  } catch (err) {
+    // token OAuth inválido/expirado — devolve erro legível em vez de 500 mudo
+    return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
+  }
   const results: Record<string, number | string> = {};
 
   let followedIds = new Set<string>();
