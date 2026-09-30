@@ -26,9 +26,7 @@ export interface BrokerSummary {
   broker: string;
   currentBalance: number | null;
   lastEntryDate: Date | null;
-  p7: PeriodStats | null;
-  p15: PeriodStats | null;
-  p30: PeriodStats | null;
+  period: PeriodStats | null;
 }
 
 // Lucro de um período = variação do saldo, descontando aportes e somando de volta saques —
@@ -53,22 +51,21 @@ function computePeriod(entries: BalanceEntry[], sinceDays: number): PeriodStats 
   return { profit, profitPct: (profit / base) * 100, deposits, withdrawals };
 }
 
-export async function getBrokerSummaries(): Promise<BrokerSummary[]> {
+// days: 1 a 30, escolhido por você na página (evita ter uma coluna fixa por janela).
+export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]> {
   const rows = await db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate));
 
   return BROKERS.map((broker) => {
     const entries = rows.filter((r) => r.broker === broker);
     if (entries.length === 0) {
-      return { broker, currentBalance: null, lastEntryDate: null, p7: null, p15: null, p30: null };
+      return { broker, currentBalance: null, lastEntryDate: null, period: null };
     }
     const last = entries[entries.length - 1];
     return {
       broker,
       currentBalance: last.balance,
       lastEntryDate: last.entryDate,
-      p7: computePeriod(entries, 7),
-      p15: computePeriod(entries, 15),
-      p30: computePeriod(entries, 30),
+      period: computePeriod(entries, days),
     };
   });
 }

@@ -28,28 +28,36 @@ function PeriodCell({ p }: { p: PeriodStats | null }) {
   );
 }
 
-export default async function CarteiraPage() {
+export default async function CarteiraPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dias?: string }>;
+}) {
+  const { dias } = await searchParams;
+  const days = Math.min(30, Math.max(1, Number(dias) || 7));
+
   let summaries: Awaited<ReturnType<typeof getBrokerSummaries>> = [];
   let entries: Awaited<ReturnType<typeof getAllEntries>> = [];
   let error: string | null = null;
 
   try {
-    [summaries, entries] = await Promise.all([getBrokerSummaries(), getAllEntries()]);
+    [summaries, entries] = await Promise.all([getBrokerSummaries(days), getAllEntries()]);
   } catch (e) {
     error = (e as Error).message;
   }
 
   const totalBalance = summaries.reduce((acc, s) => acc + (s.currentBalance ?? 0), 0);
-
-  function totalOf(key: "p7" | "p15" | "p30"): PeriodStats | null {
-    const withData = summaries.map((s) => s[key]).filter((p): p is PeriodStats => p !== null);
-    if (withData.length === 0) return null;
-    const profit = withData.reduce((acc, p) => acc + p.profit, 0);
-    const deposits = withData.reduce((acc, p) => acc + p.deposits, 0);
-    const withdrawals = withData.reduce((acc, p) => acc + p.withdrawals, 0);
-    const base = totalBalance - profit;
-    return { profit, profitPct: base > 0 ? (profit / base) * 100 : 0, deposits, withdrawals };
-  }
+  const withData = summaries.map((s) => s.period).filter((p): p is PeriodStats => p !== null);
+  const totalPeriod: PeriodStats | null =
+    withData.length === 0
+      ? null
+      : (() => {
+          const profit = withData.reduce((acc, p) => acc + p.profit, 0);
+          const deposits = withData.reduce((acc, p) => acc + p.deposits, 0);
+          const withdrawals = withData.reduce((acc, p) => acc + p.withdrawals, 0);
+          const base = totalBalance - profit;
+          return { profit, profitPct: base > 0 ? (profit / base) * 100 : 0, deposits, withdrawals };
+        })();
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -74,15 +82,41 @@ export default async function CarteiraPage() {
             </div>
           </div>
 
+          <form
+            method="get"
+            className="mt-6 flex items-end gap-2 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            <div>
+              <label htmlFor="dias" className="block text-xs font-medium text-zinc-500">
+                Lucro dos últimos N dias (1 a 30)
+              </label>
+              <input
+                id="dias"
+                name="dias"
+                type="number"
+                min={1}
+                max={30}
+                defaultValue={days}
+                className="mt-1 w-24 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Aplicar
+            </button>
+          </form>
+
           <div className="mt-6 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-200 text-left text-zinc-500 dark:border-zinc-800">
                   <th className="py-2 pr-4">Corretora</th>
                   <th className="py-2 pr-4">Saldo</th>
-                  <th className="py-2 pr-4">7 dias (lucro % · depósito · retirada)</th>
-                  <th className="py-2 pr-4">15 dias</th>
-                  <th className="py-2 pr-4">30 dias</th>
+                  <th className="py-2 pr-4">
+                    Lucro {days} dia{days > 1 ? "s" : ""} (lucro % · depósito · retirada)
+                  </th>
                   <th className="py-2">Atualizado</th>
                 </tr>
               </thead>
@@ -95,9 +129,7 @@ export default async function CarteiraPage() {
                     <td className="py-2 pr-4 align-top">
                       {s.currentBalance !== null ? money(s.currentBalance) : "—"}
                     </td>
-                    <PeriodCell p={s.p7} />
-                    <PeriodCell p={s.p15} />
-                    <PeriodCell p={s.p30} />
+                    <PeriodCell p={s.period} />
                     <td className="py-2 align-top text-xs text-zinc-500">
                       {s.lastEntryDate ? s.lastEntryDate.toLocaleDateString("pt-BR") : "—"}
                     </td>
@@ -106,16 +138,14 @@ export default async function CarteiraPage() {
                 <tr className="font-semibold text-black dark:text-zinc-50">
                   <td className="py-2 pr-4 align-top">Total</td>
                   <td className="py-2 pr-4 align-top">{money(totalBalance)}</td>
-                  <PeriodCell p={totalOf("p7")} />
-                  <PeriodCell p={totalOf("p15")} />
-                  <PeriodCell p={totalOf("p30")} />
+                  <PeriodCell p={totalPeriod} />
                   <td></td>
                 </tr>
               </tbody>
             </table>
             <p className="mt-3 text-xs text-zinc-500">
-              As colunas de 7/15/30 dias só preenchem depois que houver um lançamento anterior à
-              janela — com um único saldo cadastrado, ainda não dá pra calcular.
+              Só calcula quando houver um lançamento anterior à janela escolhida — com um único
+              saldo cadastrado, ainda não dá pra calcular.
             </p>
           </div>
 
