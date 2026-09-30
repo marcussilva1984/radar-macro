@@ -1,5 +1,6 @@
 import { getBrokerSummaries, getAllEntries, type PeriodStats } from "@/lib/brokerPortfolio";
 import { BrokerBalanceForm } from "@/app/components/BrokerBalanceForm";
+import { PortfolioSimulator } from "@/app/components/PortfolioSimulator";
 
 export const dynamic = "force-dynamic";
 
@@ -191,6 +192,8 @@ export default async function CarteiraPage({
               </tbody>
             </table>
           </div>
+
+          <PortfolioSimulator initialBalance={totalBalance} />
         </>
       )}
     </div>
