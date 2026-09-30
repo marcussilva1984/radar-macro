@@ -116,3 +116,22 @@ export const b3Ideas = pgTable(
   },
   (t) => [index("b3_ideas_kind_idx").on(t.kind)]
 );
+
+// Lançamentos manuais de saldo por corretora — você preenche periodicamente, e o app calcula
+// lucro/porcentagem em janelas de 7/15/30 dias a partir da série de saldos + aportes/saques.
+export const brokerBalances = pgTable(
+  "broker_balances",
+  {
+    id: serial("id").primaryKey(),
+    broker: text("broker").notNull(), // 'EBC' | 'AXI' | 'ICMarkets' | 'FBS'
+    entryDate: timestamp("entry_date", { withTimezone: true }).notNull(),
+    balance: doublePrecision("balance").notNull(),
+    deposit: doublePrecision("deposit").notNull().default(0),
+    withdrawal: doublePrecision("withdrawal").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("broker_balances_broker_date_idx").on(t.broker, t.entryDate),
+    uniqueIndex("broker_balances_broker_date_unique").on(t.broker, t.entryDate),
+  ]
+);

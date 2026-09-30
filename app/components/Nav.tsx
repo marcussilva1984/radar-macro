@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "Radar Semanal" },
   { href: "/forex", label: "Forex" },
+  { href: "/forex/carteira", label: "Carteira" },
   { href: "/correlacoes", label: "Correlações" },
   { href: "/fluxo", label: "Mapa de Fluxo" },
   { href: "/semana", label: "Resumo da semana" },
