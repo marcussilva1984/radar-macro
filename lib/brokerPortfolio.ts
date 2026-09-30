@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db/client";
 import { brokerBalances } from "@/lib/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 
 export const BROKERS = ["EBC", "AXI", "ICMarkets", "FBS"] as const;
 export type Broker = (typeof BROKERS)[number];
@@ -15,21 +15,26 @@ export interface BalanceEntry {
   withdrawal: number;
 }
 
+export interface PeriodStats {
+  profit: number;
+  profitPct: number;
+  deposits: number;
+  withdrawals: number;
+}
+
 export interface BrokerSummary {
   broker: string;
   currentBalance: number | null;
   lastEntryDate: Date | null;
-  profit7d: number | null;
-  profitPct7d: number | null;
-  profit15d: number | null;
-  profitPct15d: number | null;
-  profit30d: number | null;
-  profitPct30d: number | null;
+  p7: PeriodStats | null;
+  p15: PeriodStats | null;
+  p30: PeriodStats | null;
 }
 
 // Lucro de um período = variação do saldo, descontando aportes e somando de volta saques —
-// senão um depósito grande pareceria "lucro" e um saque pareceria "prejuízo".
-function computeProfit(entries: BalanceEntry[], sinceDays: number): { profit: number; pct: number } | null {
+// senão um depósito grande pareceria "lucro" e um saque pareceria "prejuízo". Também devolve
+// o total depositado/sacado no período, pra você ver quando fez cada coisa.
+function computePeriod(entries: BalanceEntry[], sinceDays: number): PeriodStats | null {
   if (entries.length === 0) return null;
   const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
   const last = entries[entries.length - 1];
@@ -41,10 +46,11 @@ function computeProfit(entries: BalanceEntry[], sinceDays: number): { profit: nu
   if (baseline.id === last.id) return null; // só uma entrada, sem período pra comparar
 
   const between = entries.filter((e) => e.entryDate > baseline.entryDate && e.entryDate <= last.entryDate);
-  const netFlows = between.reduce((acc, e) => acc + e.deposit - e.withdrawal, 0);
-  const profit = last.balance - baseline.balance - netFlows;
+  const deposits = between.reduce((acc, e) => acc + e.deposit, 0);
+  const withdrawals = between.reduce((acc, e) => acc + e.withdrawal, 0);
+  const profit = last.balance - baseline.balance - deposits + withdrawals;
   const base = baseline.balance || 1;
-  return { profit, pct: (profit / base) * 100 };
+  return { profit, profitPct: (profit / base) * 100, deposits, withdrawals };
 }
 
 export async function getBrokerSummaries(): Promise<BrokerSummary[]> {
@@ -53,34 +59,24 @@ export async function getBrokerSummaries(): Promise<BrokerSummary[]> {
   return BROKERS.map((broker) => {
     const entries = rows.filter((r) => r.broker === broker);
     if (entries.length === 0) {
-      return {
-        broker,
-        currentBalance: null,
-        lastEntryDate: null,
-        profit7d: null,
-        profitPct7d: null,
-        profit15d: null,
-        profitPct15d: null,
-        profit30d: null,
-        profitPct30d: null,
-      };
+      return { broker, currentBalance: null, lastEntryDate: null, p7: null, p15: null, p30: null };
     }
     const last = entries[entries.length - 1];
-    const p7 = computeProfit(entries, 7);
-    const p15 = computeProfit(entries, 15);
-    const p30 = computeProfit(entries, 30);
     return {
       broker,
       currentBalance: last.balance,
       lastEntryDate: last.entryDate,
-      profit7d: p7?.profit ?? null,
-      profitPct7d: p7?.pct ?? null,
-      profit15d: p15?.profit ?? null,
-      profitPct15d: p15?.pct ?? null,
-      profit30d: p30?.profit ?? null,
-      profitPct30d: p30?.pct ?? null,
+      p7: computePeriod(entries, 7),
+      p15: computePeriod(entries, 15),
+      p30: computePeriod(entries, 30),
     };
   });
+}
+
+// Todos os lançamentos de todas as corretoras, mais recente primeiro — o "extrato" de quando
+// cada depósito/retirada/atualização de saldo foi feita.
+export async function getAllEntries(): Promise<BalanceEntry[]> {
+  return db.select().from(brokerBalances).orderBy(desc(brokerBalances.entryDate));
 }
 
 export async function getHistory(broker: string): Promise<BalanceEntry[]> {
