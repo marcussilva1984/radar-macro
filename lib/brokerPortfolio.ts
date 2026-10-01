@@ -128,3 +128,63 @@ export async function addBalanceEntry(input: {
       set: { balance: input.balance, deposit: input.deposit, withdrawal: input.withdrawal },
     });
 }
+
+export async function updateBalanceEntry(
+  id: number,
+  input: { entryDate: Date; balance: number; deposit: number; withdrawal: number }
+): Promise<void> {
+  await db
+    .update(brokerBalances)
+    .set({
+      entryDate: input.entryDate,
+      balance: input.balance,
+      deposit: input.deposit,
+      withdrawal: input.withdrawal,
+    })
+    .where(eq(brokerBalances.id, id));
+}
+
+export async function deleteBalanceEntry(id: number): Promise<void> {
+  await db.delete(brokerBalances).where(eq(brokerBalances.id, id));
+}
+
+// Reusa a mesma lógica de "lucro desde a última atualização" pra decidir se manda alerta de
+// drawdown logo depois de um lançamento novo (chamado pela API route, não pela página).
+export async function getSinceLastUpdateForBroker(broker: string): Promise<SinceLastUpdateStats | null> {
+  const entries = await getHistory(broker);
+  return computeSinceLastUpdate(entries);
+}
+
+// Lucro do mês corrente (1º dia até hoje), somado entre todas as corretoras — pra comparar com
+// a projeção do simulador de meta. "baseBalance" é o saldo-base pra calcular % (mesma convenção
+// de totalPeriod na página: saldo atual menos o lucro do período).
+export async function getMonthToDateStats(): Promise<{
+  profit: number;
+  baseBalance: number;
+  daysElapsed: number;
+  daysInMonth: number;
+} | null> {
+  const now = new Date();
+  const daysElapsed = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  const rows = await db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate));
+  let totalProfit = 0;
+  let totalBalance = 0;
+  let hasAny = false;
+
+  for (const broker of BROKERS) {
+    const entries = rows.filter((r) => r.broker === broker);
+    if (entries.length === 0) continue;
+    const last = entries[entries.length - 1];
+    totalBalance += last.balance;
+    const period = computePeriod(entries, daysElapsed);
+    if (period) {
+      totalProfit += period.profit;
+      hasAny = true;
+    }
+  }
+
+  if (!hasAny) return null;
+  return { profit: totalProfit, baseBalance: totalBalance - totalProfit, daysElapsed, daysInMonth };
+}

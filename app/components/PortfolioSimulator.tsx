@@ -36,7 +36,20 @@ function money(v: number) {
   return `$${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
 }
 
-export function PortfolioSimulator({ initialBalance }: { initialBalance: number }) {
+interface MonthProgress {
+  profit: number;
+  baseBalance: number;
+  daysElapsed: number;
+  daysInMonth: number;
+}
+
+export function PortfolioSimulator({
+  initialBalance,
+  monthProgress,
+}: {
+  initialBalance: number;
+  monthProgress?: MonthProgress | null;
+}) {
   const [initial, setInitial] = useState(String(Math.round(initialBalance)));
   const [deposit, setDeposit] = useState("0");
   const [rate, setRate] = useState("2");
@@ -114,6 +127,26 @@ export function PortfolioSimulator({ initialBalance }: { initialBalance: number 
       )}
       {Number(target) <= Number(initial) && (
         <p className="mt-4 text-sm text-zinc-500">A meta já é menor ou igual ao saldo inicial.</p>
+      )}
+
+      {monthProgress && (
+        <div className="mt-4 rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs font-medium text-zinc-500">Progresso real deste mês vs. simulado</p>
+          {(() => {
+            const rateNum = Number(rate) || 0;
+            const expectedFullMonth = monthProgress.baseBalance * (rateNum / 100);
+            const expectedToDate = (expectedFullMonth * monthProgress.daysElapsed) / monthProgress.daysInMonth;
+            const diff = monthProgress.profit - expectedToDate;
+            const ahead = diff >= 0;
+            return (
+              <p className="mt-1 text-sm text-black dark:text-zinc-50">
+                Lucro real no mês: <span className={ahead ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>{money(monthProgress.profit)}</span>{" "}
+                · esperado até hoje (dia {monthProgress.daysElapsed}/{monthProgress.daysInMonth} a {rateNum}%/mês): {money(expectedToDate)} ·{" "}
+                {ahead ? "à frente" : "atrás"} da meta em {money(Math.abs(diff))}
+              </p>
+            );
+          })()}
+        </div>
       )}
 
       {rows.length > 0 && (

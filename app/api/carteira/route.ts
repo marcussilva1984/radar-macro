@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { addBalanceEntry, BROKERS } from "@/lib/brokerPortfolio";
+import { addBalanceEntry, getSinceLastUpdateForBroker, BROKERS } from "@/lib/brokerPortfolio";
+import { sendTelegramMessage } from "@/lib/telegram";
+
+// Dispara alerta se o lucro desde a última atualização cair abaixo disso (%).
+const DRAWDOWN_ALERT_PCT = -5;
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -21,6 +25,16 @@ export async function POST(req: Request) {
     deposit: Number(deposit) || 0,
     withdrawal: Number(withdrawal) || 0,
   });
+
+  const sinceLastUpdate = await getSinceLastUpdateForBroker(broker);
+  if (sinceLastUpdate && sinceLastUpdate.profitPct <= DRAWDOWN_ALERT_PCT) {
+    const sign = sinceLastUpdate.profit >= 0 ? "+" : "";
+    await sendTelegramMessage(
+      `⚠️ <b>Drawdown na Carteira — ${broker}</b>\n` +
+        `${sign}$${sinceLastUpdate.profit.toFixed(2)} (${sinceLastUpdate.profitPct.toFixed(1)}%) ` +
+        `em ${sinceLastUpdate.days} dia${sinceLastUpdate.days > 1 ? "s" : ""}`
+    ).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true });
 }
