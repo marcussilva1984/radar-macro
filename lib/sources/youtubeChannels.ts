@@ -11,13 +11,17 @@ export const YOUTUBE_SEARCH_TOPICS = [
   "bitcoin crypto market macro",
   "forex dollar currency outlook",
   "China US trade tension",
-  // cripto/altcoins — mais termos pra achar canais americanos focados nisso que você ainda
-  // não segue (aparecem marcados "👀 não seguido" na aba Vídeos, pra você decidir se inscreve)
-  "altcoin season crypto market",
-  "bitcoin price prediction analysis",
-  "crypto market news today",
-  "ethereum price analysis",
-  "altcoin news today",
+];
+
+// Canais americanos de cripto/altcoins conhecidos, ingeridos via RSS (grátis, sem gastar cota
+// de search.list) em vez de busca por tema — ver lib/sources/youtubeRss.ts. channelId é o ID
+// real do canal (não o @handle), encontrado em "Ver página do canal" > copiar URL.
+export const SEED_CRYPTO_CHANNELS: { channelId: string; label: string }[] = [
+  { channelId: "UCqK_GSMbpiV8spgD3ZGloSw", label: "Coin Bureau" },
+  { channelId: "UCRvqjQPSeaWn-uEx-w0XOIg", label: "Benjamin Cowen" },
+  { channelId: "UCbLhGKVY-bJPcawebgtNfbw", label: "Altcoin Daily" },
+  { channelId: "UCAl9Ld79qaZxp9JzEOwd3aA", label: "Bankless" },
+  { channelId: "UClgJyzwGs-GyaNxUHcLZrkg", label: "InvestAnswers" },
 ];
 
 // Canais brasileiros que você realmente quer ver, mesmo focando em conteúdo internacional —

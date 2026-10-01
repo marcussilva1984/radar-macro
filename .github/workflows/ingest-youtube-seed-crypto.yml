@@ -1,0 +1,20 @@
+name: Ingest YouTube seed crypto channels (4x/day)
+
+on:
+  schedule:
+    # RSS é grátis (sem cota de search.list) — só o check de duração gasta uma cota mínima
+    # (~1 unidade a cada 50 vídeos), então dá pra rodar mais vezes por dia sem problema.
+    - cron: "0 9 * * *"
+    - cron: "0 14 * * *"
+    - cron: "0 19 * * *"
+    - cron: "0 23 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call ingest-youtube-seed-crypto endpoint
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://radar-macro.vercel.app/api/cron/ingest-youtube-seed-crypto"

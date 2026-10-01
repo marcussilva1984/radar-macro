@@ -1,11 +1,12 @@
-name: Ingest YouTube discover (1x/day)
+name: Ingest YouTube discover (2x/day)
 
 on:
   schedule:
-    # Descoberta por tema (canais que você não segue) — caro em cota (~1300 unid/rodada com
-    # 13 tópicos incluindo cripto/altcoins); 1x/dia pra não estourar os 10k/dia junto com o
-    # cron de subscriptions (8x/dia, ~980 unid cada = ~7840/dia).
+    # Descoberta por tema (canais que você não segue) — caro em cota (~800 unid/rodada, 8
+    # tópicos), 2x/dia. Cripto/altcoins de canais já conhecidos saiu daqui — ver
+    # ingest-youtube-seed-crypto.yml (via RSS, grátis).
     - cron: "0 10 * * *"
+    - cron: "0 22 * * *"
   workflow_dispatch: {}
 
 jobs:
