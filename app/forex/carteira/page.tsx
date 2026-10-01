@@ -1,4 +1,9 @@
-import { getBrokerSummaries, getAllEntries, type PeriodStats } from "@/lib/brokerPortfolio";
+import {
+  getBrokerSummaries,
+  getAllEntries,
+  type PeriodStats,
+  type SinceLastUpdateStats,
+} from "@/lib/brokerPortfolio";
 import { BrokerBalanceForm } from "@/app/components/BrokerBalanceForm";
 import { PortfolioSimulator } from "@/app/components/PortfolioSimulator";
 
@@ -24,6 +29,22 @@ function PeriodCell({ p }: { p: PeriodStats | null }) {
         {p.deposits > 0 && <span>depósito {money(p.deposits)} </span>}
         {p.withdrawals > 0 && <span>retirada {money(p.withdrawals)}</span>}
         {p.deposits === 0 && p.withdrawals === 0 && <span>sem aporte/saque</span>}
+      </div>
+    </td>
+  );
+}
+
+function SinceLastUpdateCell({ p }: { p: SinceLastUpdateStats | null }) {
+  if (!p) return <td className="py-2 pr-4 align-top text-zinc-400">—</td>;
+  return (
+    <td className={`py-2 pr-4 align-top ${pctColor(p.profit)}`}>
+      <div className="font-medium">
+        {money(p.profit)} ({p.profitPct.toFixed(1)}%)
+      </div>
+      <div className="mt-0.5 text-xs font-normal text-zinc-500">
+        em {p.days} dia{p.days > 1 ? "s" : ""}
+        {p.deposits > 0 && <span> · depósito {money(p.deposits)}</span>}
+        {p.withdrawals > 0 && <span> · retirada {money(p.withdrawals)}</span>}
       </div>
     </td>
   );
@@ -60,6 +81,32 @@ export default async function CarteiraPage({
           return { profit, profitPct: base > 0 ? (profit / base) * 100 : 0, deposits, withdrawals };
         })();
 
+  const withSinceLast = summaries
+    .map((s) => s.sinceLastUpdate)
+    .filter((p): p is SinceLastUpdateStats => p !== null);
+  const totalSinceLastUpdate: SinceLastUpdateStats | null =
+    withSinceLast.length === 0
+      ? null
+      : (() => {
+          const profit = withSinceLast.reduce((acc, p) => acc + p.profit, 0);
+          const deposits = withSinceLast.reduce((acc, p) => acc + p.deposits, 0);
+          const withdrawals = withSinceLast.reduce((acc, p) => acc + p.withdrawals, 0);
+          const base = totalBalance - profit;
+          const days = Math.max(...withSinceLast.map((p) => p.days));
+          const fromDate = withSinceLast.reduce(
+            (acc, p) => (p.fromDate < acc ? p.fromDate : acc),
+            withSinceLast[0].fromDate
+          );
+          return {
+            profit,
+            profitPct: base > 0 ? (profit / base) * 100 : 0,
+            deposits,
+            withdrawals,
+            days,
+            fromDate,
+          };
+        })();
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Carteira</h1>
@@ -81,6 +128,46 @@ export default async function CarteiraPage({
             <div className="mt-2">
               <BrokerBalanceForm />
             </div>
+          </div>
+
+          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
+            Lucro desde a última atualização
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Calculado automaticamente entre os dois últimos lançamentos de cada corretora — não
+            importa de quantos em quantos dias você atualiza o saldo.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 text-left text-zinc-500 dark:border-zinc-800">
+                  <th className="py-2 pr-4">Corretora</th>
+                  <th className="py-2 pr-4">Saldo</th>
+                  <th className="py-2 pr-4">Lucro desde a última atualização</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaries.map((s) => (
+                  <tr key={s.broker} className="border-b border-zinc-100 dark:border-zinc-900">
+                    <td className="py-2 pr-4 align-top font-medium text-black dark:text-zinc-50">
+                      {s.broker}
+                    </td>
+                    <td className="py-2 pr-4 align-top">
+                      {s.currentBalance !== null ? money(s.currentBalance) : "—"}
+                    </td>
+                    <SinceLastUpdateCell p={s.sinceLastUpdate} />
+                  </tr>
+                ))}
+                <tr className="font-semibold text-black dark:text-zinc-50">
+                  <td className="py-2 pr-4 align-top">Total</td>
+                  <td className="py-2 pr-4 align-top">{money(totalBalance)}</td>
+                  <SinceLastUpdateCell p={totalSinceLastUpdate} />
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-3 text-xs text-zinc-500">
+              Só calcula quando a corretora já tem pelo menos 2 lançamentos.
+            </p>
           </div>
 
           <form

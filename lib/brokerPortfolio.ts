@@ -22,11 +22,17 @@ export interface PeriodStats {
   withdrawals: number;
 }
 
+export interface SinceLastUpdateStats extends PeriodStats {
+  days: number;
+  fromDate: Date;
+}
+
 export interface BrokerSummary {
   broker: string;
   currentBalance: number | null;
   lastEntryDate: Date | null;
   period: PeriodStats | null;
+  sinceLastUpdate: SinceLastUpdateStats | null;
 }
 
 // Lucro de um período = variação do saldo, descontando aportes e somando de volta saques —
@@ -51,6 +57,28 @@ function computePeriod(entries: BalanceEntry[], sinceDays: number): PeriodStats 
   return { profit, profitPct: (profit / base) * 100, deposits, withdrawals };
 }
 
+// Lucro entre os dois últimos lançamentos — o que importa quando você não atualiza todo dia:
+// não precisa escolher uma janela, é sempre "desde a última vez que você mexeu no saldo".
+function computeSinceLastUpdate(entries: BalanceEntry[]): SinceLastUpdateStats | null {
+  if (entries.length < 2) return null;
+  const last = entries[entries.length - 1];
+  const prev = entries[entries.length - 2];
+  const profit = last.balance - prev.balance - last.deposit + last.withdrawal;
+  const base = prev.balance || 1;
+  const days = Math.max(
+    1,
+    Math.round((last.entryDate.getTime() - prev.entryDate.getTime()) / (24 * 60 * 60 * 1000))
+  );
+  return {
+    profit,
+    profitPct: (profit / base) * 100,
+    deposits: last.deposit,
+    withdrawals: last.withdrawal,
+    days,
+    fromDate: prev.entryDate,
+  };
+}
+
 // days: 1 a 30, escolhido por você na página (evita ter uma coluna fixa por janela).
 export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]> {
   const rows = await db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate));
@@ -58,7 +86,7 @@ export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]>
   return BROKERS.map((broker) => {
     const entries = rows.filter((r) => r.broker === broker);
     if (entries.length === 0) {
-      return { broker, currentBalance: null, lastEntryDate: null, period: null };
+      return { broker, currentBalance: null, lastEntryDate: null, period: null, sinceLastUpdate: null };
     }
     const last = entries[entries.length - 1];
     return {
@@ -66,6 +94,7 @@ export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]>
       currentBalance: last.balance,
       lastEntryDate: last.entryDate,
       period: computePeriod(entries, days),
+      sinceLastUpdate: computeSinceLastUpdate(entries),
     };
   });
 }
