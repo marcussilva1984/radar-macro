@@ -10,6 +10,8 @@ import { BrokerBalanceForm } from "@/app/components/BrokerBalanceForm";
 import { PortfolioSimulator } from "@/app/components/PortfolioSimulator";
 import { BalanceChart } from "@/app/components/BalanceChart";
 import { EntryRow } from "@/app/components/EntryRow";
+import { MonthGoalPanel } from "@/app/components/MonthGoalPanel";
+import { MonthlyPnL } from "@/app/components/MonthlyPnL";
 
 export const dynamic = "force-dynamic";
 
@@ -140,11 +142,25 @@ export default async function CarteiraPage({
           </div>
 
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
+            Metas do mês
+          </h2>
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <MonthGoalPanel entries={entries} brokers={BROKERS} />
+          </div>
+
+          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
             Evolução do saldo
           </h2>
           <p className="mt-1 text-xs text-zinc-500">Saldo total e por corretora ao longo do tempo.</p>
           <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <BalanceChart entries={entries} brokers={BROKERS} />
+          </div>
+
+          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
+            Rentabilidade mensal
+          </h2>
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <MonthlyPnL entries={entries} brokers={BROKERS} />
           </div>
 
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
