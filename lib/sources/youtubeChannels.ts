@@ -11,6 +11,13 @@ export const YOUTUBE_SEARCH_TOPICS = [
   "bitcoin crypto market macro",
   "forex dollar currency outlook",
   "China US trade tension",
+  // cripto/altcoins — mais termos pra achar canais americanos focados nisso que você ainda
+  // não segue (aparecem marcados "👀 não seguido" na aba Vídeos, pra você decidir se inscreve)
+  "altcoin season crypto market",
+  "bitcoin price prediction analysis",
+  "crypto market news today",
+  "ethereum price analysis",
+  "altcoin news today",
 ];
 
 // Canais brasileiros que você realmente quer ver, mesmo focando em conteúdo internacional —
@@ -29,7 +36,8 @@ export const RELEVANCE_KEYWORDS = [
   // câmbio / forex
   "dólar", "dollar", "câmbio", "\\bforex\\b", "currency",
   // criptoativos
-  "bitcoin", "cripto", "crypto", "ethereum", "blockchain", "altcoin", "web3",
+  "bitcoin", "\\bbtc\\b", "cripto", "crypto", "ethereum", "\\beth\\b", "blockchain",
+  "altcoin", "altseason", "web3", "defi", "solana", "\\bxrp\\b", "stablecoin", "memecoin",
   // geopolítica
   "geopolít", "geopolit", "guerra", "\\bwar\\b", "ucrânia", "ukraine", "rússia", "russia",
   "china", "taiwan", "\\birã\\b", "\\biran\\b", "israel", "middle east", "oriente médio",
