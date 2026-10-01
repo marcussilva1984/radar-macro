@@ -53,8 +53,12 @@ export function MonthGoalPanel({ entries, brokers }: { entries: BalanceEntry[]; 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysElapsed = now.getDate();
   const monthStart = new Date(year, month, 1);
+  // Entradas são gravadas com T12:00:00Z (meio-dia UTC) — se o request rodar antes do
+  // meio-dia UTC, comparar direto com `now` excluiria o lançamento de hoje. Usa o fim do dia
+  // de hoje como limite em vez do segundo exato atual.
+  const periodEnd = new Date(year, month, now.getDate() + 1);
 
-  const monthDone = periodReturn(entries, brokers, monthStart, now);
+  const monthDone = periodReturn(entries, brokers, monthStart, periodEnd);
   const proRataPct = (goalVal * daysElapsed) / daysInMonth;
   const doneActualPct = monthDone?.pct ?? 0;
   const diff = doneActualPct - proRataPct;
