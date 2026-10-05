@@ -133,7 +133,62 @@ function buildIdeas(
   return ideas.sort((a, b) => order[a.conviction] - order[b.conviction]);
 }
 
-const TRACKED_COINS = ["bitcoin", "ethereum", "solana", "chainlink", "hyperliquid"];
+const TRACKED_COINS = [
+  "bitcoin",
+  "ethereum",
+  "solana",
+  "chainlink",
+  "hyperliquid",
+  "ripple",
+  "cardano",
+  "avalanche-2",
+  "dogecoin",
+  "sui",
+];
+
+export interface CryptoEntrada {
+  title: string;
+  detail: string;
+  conviction: Conviction;
+  score: number;
+}
+
+const ENTRADA_SIGNAL_THRESHOLD = 1.5; // pp de força relativa vs BTC
+const ENTRADA_STRONG_THRESHOLD = 5;
+
+function entradaConvictionOf(absScore: number): Conviction {
+  if (absScore >= ENTRADA_STRONG_THRESHOLD) return "forte";
+  if (absScore >= ENTRADA_SIGNAL_THRESHOLD) return "médio";
+  return "fraco";
+}
+
+// "Melhores oportunidades": força relativa de cada altcoin contra o BTC (não contra USD) —
+// mesma lógica do par EUR/USD no forex, só que a "moeda base" aqui é sempre BTC. Isola o
+// movimento específico da moeda/altcoin do movimento geral do mercado (que seria só "tudo sobe
+// porque BTC subiu").
+function buildEntradas(btc: CoinMarket | null, coins: CoinMarket[]): CryptoEntrada[] {
+  if (!btc || btc.changePct24h === null || btc.changePct7d === null) return [];
+
+  const entradas: CryptoEntrada[] = [];
+  for (const c of coins) {
+    if (c.id === "bitcoin" || c.changePct24h === null || c.changePct7d === null) continue;
+    const rel24h = c.changePct24h - btc.changePct24h;
+    const rel7d = c.changePct7d - btc.changePct7d;
+    const score = 0.4 * rel24h + 0.6 * rel7d;
+    if (Math.abs(score) < ENTRADA_SIGNAL_THRESHOLD) continue;
+
+    const long = score > 0;
+    const trendConsistent = Math.sign(rel24h) === Math.sign(rel7d) && Math.abs(rel24h) > 0.5 && Math.abs(rel7d) > 0.5;
+    entradas.push({
+      title: `${long ? "Compra" : "Venda"} ${c.symbol} / ${long ? "Venda" : "Compra"} BTC`,
+      detail: `Força relativa vs BTC: 24h ${rel24h >= 0 ? "+" : ""}${rel24h.toFixed(2)}pp, 7d ${rel7d >= 0 ? "+" : ""}${rel7d.toFixed(2)}pp${trendConsistent ? " (consistente nos dois prazos)" : ""}. ${c.symbol} ${long ? "performando melhor" : "performando pior"} que BTC — isola o movimento do ativo em si, não o mercado geral subindo/caindo junto.`,
+      conviction: entradaConvictionOf(Math.abs(score)),
+      score: Math.abs(score),
+    });
+  }
+
+  return entradas.sort((a, b) => b.score - a.score).slice(0, 6);
+}
 
 export async function getCryptoBoard(): Promise<{
   coins: CoinMarket[];
@@ -141,6 +196,7 @@ export async function getCryptoBoard(): Promise<{
   fearGreed: FearGreed | null;
   narrative: NarrativeMention[];
   ideas: CryptoIdea[];
+  entradas: CryptoEntrada[];
 }> {
   const [coins, categories, fearGreed, narrative] = await Promise.all([
     getCoinMarkets(TRACKED_COINS),
@@ -157,6 +213,7 @@ export async function getCryptoBoard(): Promise<{
     .slice(0, 10);
 
   const ideas = buildIdeas(btc, topCategories, fearGreed, narrative);
+  const entradas = buildEntradas(btc, coins);
 
-  return { coins, categories: topCategories, fearGreed, narrative, ideas };
+  return { coins, categories: topCategories, fearGreed, narrative, ideas, entradas };
 }

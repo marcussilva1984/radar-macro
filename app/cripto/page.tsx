@@ -82,6 +82,30 @@ export default async function CriptoPage() {
             </>
           )}
 
+          {board.entradas.length > 0 && (
+            <>
+              <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">Melhores oportunidades (vs BTC)</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Força relativa de cada moeda contra o BTC (não contra USD) — isola o movimento
+                específico do ativo do movimento geral do mercado cripto. Heurística, não
+                recomendação de entrada/saída.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {board.entradas.map((e, i) => (
+                  <li key={i} className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[e.conviction]}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[e.conviction]}`}>
+                        {e.conviction}
+                      </span>
+                      <p className={`font-medium ${CONVICTION_TEXT[e.conviction]}`}>{e.title}</p>
+                    </div>
+                    <p className={`mt-1 opacity-80 ${CONVICTION_TEXT[e.conviction]}`}>{e.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">Preços</h2>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
