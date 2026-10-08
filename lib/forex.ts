@@ -40,6 +40,7 @@ export interface TradeIdea {
   detail: string;
   pairs: FxPair[];
   conviction: Conviction;
+  score: number;
 }
 
 function convictionOf(absScore: number): Conviction {
@@ -95,7 +96,7 @@ export function computeCurrencyStrength(changes: Map<FxPair, number>): CurrencyS
 const SIGNAL_THRESHOLD = 0.15;
 const TREND_THRESHOLD = 0.1;
 
-const MIN_IDEAS = 10;
+const MIN_IDEAS = 30;
 
 function buildTradeIdeas(
   signals: FxPairSignal[],
@@ -112,6 +113,7 @@ function buildTradeIdeas(
       detail: `Variação diária ${s.changePct?.toFixed(2)}% e semanal ${s.weeklyChangePct?.toFixed(2)}% na mesma direção — não é só ruído de um dia.`,
       pairs: [s.pair],
       conviction: convictionOf(Math.abs(s.score)),
+      score: Math.abs(s.score),
     });
   }
 
@@ -130,6 +132,7 @@ function buildTradeIdeas(
         detail: `AUD e NZD historicamente correlacionadas (r=${audNzdCorr.toFixed(2)} nos últimos 30 dias) — se ${sigA.base}/${sigA.quote} segue em ${sigA.signal}, há espaço pra ${sigB.base}/${sigB.quote} convergir na mesma direção, especialmente se o diferencial de juros não mudar.`,
         pairs: [a, b],
         conviction: convictionOf(Math.abs(sigA.score)),
+        score: Math.abs(sigA.score),
       });
     }
   }
@@ -157,6 +160,7 @@ function buildTradeIdeas(
         detail: `Não compartilha moeda com "${idea.title}" — serve pra não concentrar a aposta numa moeda só.`,
         pairs: [hedgeCandidate.pair],
         conviction: convictionOf(Math.abs(hedgeCandidate.score)),
+        score: Math.abs(hedgeCandidate.score),
       });
     }
   }
@@ -172,6 +176,7 @@ function buildTradeIdeas(
       detail: `Força relativa ${s.strengthDiff?.toFixed(2) ?? "—"} e carry ${s.carryDiff.toFixed(2)}pp apontam ${s.signal}, mas sem confirmação diário+semanal ainda — convicção menor.`,
       pairs: [s.pair],
       conviction: convictionOf(Math.abs(s.score)),
+      score: Math.abs(s.score),
     });
     usedPairs.add(s.pair);
   }
@@ -277,7 +282,7 @@ function generateEntradas(
     }
   }
 
-  return [...seen.values()].sort((a, b) => b.score - a.score).slice(0, 5);
+  return [...seen.values()].sort((a, b) => b.score - a.score).slice(0, 30);
 }
 
 export async function getForexBoard(): Promise<{

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "./components/Nav";
+import { Ticker } from "./components/Ticker";
+import { getTickerItems } from "@/lib/liveQuotes";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,13 +20,16 @@ export const metadata: Metadata = {
   description: "Timeline de eventos macro/geopolítica vs. fluxo de ativos",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const tickerItems = await getTickerItems().catch(() => []);
+
   return (
     <html
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-black">
+        <Ticker items={tickerItems} />
         <Nav />
         {children}
       </body>

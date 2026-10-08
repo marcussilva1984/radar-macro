@@ -31,7 +31,14 @@ function money(v: number) {
   return `$${v.toLocaleString("pt-BR", { maximumFractionDigits: v < 10 ? 4 : 2 })}`;
 }
 
-export default async function CriptoPage() {
+export default async function CriptoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ n?: string }>;
+}) {
+  const { n } = await searchParams;
+  const ideaCount = Math.min(30, Math.max(1, Number(n) || 10));
+
   let board: Awaited<ReturnType<typeof getCryptoBoard>> | null = null;
   let error: string | null = null;
 
@@ -58,20 +65,41 @@ export default async function CriptoPage() {
 
       {board && (
         <>
+          <form method="get" className="mt-6 flex items-end gap-2 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div>
+              <label htmlFor="n" className="block text-xs font-medium text-zinc-500">
+                Quantas ideias/oportunidades mostrar (1 a 30)
+              </label>
+              <input
+                id="n"
+                name="n"
+                type="number"
+                min={1}
+                max={30}
+                defaultValue={ideaCount}
+                className="mt-1 w-20 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              />
+            </div>
+            <button type="submit" className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+              Aplicar
+            </button>
+          </form>
+
           {board.ideas.length > 0 && (
             <>
               <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">Ideias da semana</h2>
               <p className="mt-1 text-xs text-zinc-500">
                 Convicção: <span className="font-medium text-red-600 dark:text-red-400">forte</span> ·{" "}
                 <span className="font-medium text-yellow-600 dark:text-yellow-500">médio</span> ·{" "}
-                <span className="font-medium text-blue-600 dark:text-blue-400">fraco</span>.
+                <span className="font-medium text-blue-600 dark:text-blue-400">fraco</span>. O
+                número entre parênteses é o grau de convicção bruto.
               </p>
               <ul className="mt-3 space-y-2">
-                {board.ideas.map((idea, i) => (
+                {board.ideas.slice(0, ideaCount).map((idea, i) => (
                   <li key={i} className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[idea.conviction]}`}>
                     <div className="flex items-center gap-2">
                       <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[idea.conviction]}`}>
-                        {idea.conviction}
+                        {idea.conviction} ({idea.score.toFixed(2)})
                       </span>
                       <p className={`font-medium ${CONVICTION_TEXT[idea.conviction]}`}>{idea.title}</p>
                     </div>
@@ -91,11 +119,11 @@ export default async function CriptoPage() {
                 recomendação de entrada/saída.
               </p>
               <ul className="mt-3 space-y-2">
-                {board.entradas.map((e, i) => (
+                {board.entradas.slice(0, ideaCount).map((e, i) => (
                   <li key={i} className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[e.conviction]}`}>
                     <div className="flex items-center gap-2">
                       <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[e.conviction]}`}>
-                        {e.conviction}
+                        {e.conviction} ({e.score.toFixed(2)})
                       </span>
                       <p className={`font-medium ${CONVICTION_TEXT[e.conviction]}`}>{e.title}</p>
                     </div>

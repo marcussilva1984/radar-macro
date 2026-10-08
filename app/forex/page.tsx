@@ -1,5 +1,7 @@
 import { getForexBoard } from "@/lib/forex";
 import { POLICY_RATES_UPDATED_AT } from "@/lib/sources/policyRates";
+import { getDxyQuote, getMainFxQuotes } from "@/lib/liveQuotes";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +45,14 @@ function bar(score: number, max: number) {
   );
 }
 
-export default async function ForexPage() {
+export default async function ForexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ n?: string }>;
+}) {
+  const { n } = await searchParams;
+  const ideaCount = Math.min(30, Math.max(1, Number(n) || 10));
+
   let strength: Awaited<ReturnType<typeof getForexBoard>>["strength"] = [];
   let signals: Awaited<ReturnType<typeof getForexBoard>>["signals"] = [];
   let ideas: Awaited<ReturnType<typeof getForexBoard>>["ideas"] = [];
@@ -56,16 +65,57 @@ export default async function ForexPage() {
     error = (e as Error).message;
   }
 
+  const [dxy, mainFx] = await Promise.all([getDxyQuote(), getMainFxQuotes()]);
+
   const maxStrength = Math.max(0.01, ...strength.map((s) => Math.abs(s.score)));
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Forex</h1>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        Dados reais via Yahoo Finance (sem chave de API). →{" "}
+        <Link href="/forex/carteira" className="text-amber-600 hover:underline dark:text-amber-400">
+          Minha Carteira Forex (corretoras)
+        </Link>
+      </p>
+      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
         Força relativa das moedas (diário e semanal) + assimetria de triangulação + viés de carry
         (juros atualizados manualmente em {POLICY_RATES_UPDATED_AT}). Heurística de leitura de
         fluxo, não recomendação de entrada/saída.
       </p>
+
+      {dxy && (
+        <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-xs text-zinc-500">Índice Dólar (DXY)</p>
+          <div className="mt-1 flex items-baseline gap-3">
+            <span className="text-2xl font-semibold text-black dark:text-zinc-50">{dxy.price.toFixed(2)}</span>
+            <span className={changeColor(dxy.changePct)}>
+              {dxy.changePct >= 0 ? "+" : ""}
+              {dxy.changePct.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {mainFx.length > 0 && (
+        <>
+          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">Pares principais (G8 + BRL)</h2>
+          <div className="mt-3 divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-900 dark:border-zinc-800 dark:bg-zinc-950">
+            {mainFx.map((q) => (
+              <div key={q.label} className="flex items-center justify-between px-4 py-2 text-sm">
+                <span className="font-medium text-black dark:text-zinc-50">{q.label}</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-zinc-700 dark:text-zinc-300">{q.price < 10 ? q.price.toFixed(4) : q.price.toFixed(2)}</span>
+                  <span className={changeColor(q.changePct)}>
+                    {q.changePct >= 0 ? "+" : ""}
+                    {q.changePct.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {error && (
         <div className="mt-8 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
@@ -82,10 +132,33 @@ export default async function ForexPage() {
             Convicção: <span className="font-medium text-red-600 dark:text-red-400">forte</span> ·{" "}
             <span className="font-medium text-yellow-600 dark:text-yellow-500">médio</span> ·{" "}
             <span className="font-medium text-blue-600 dark:text-blue-400">fraco</span> — quanto
-            mais forte, mais os sinais (força, carry, assimetria, tendência) concordam entre si.
+            mais forte, mais os sinais (força, carry, assimetria, tendência) concordam entre si. O
+            número entre parênteses é o grau de convicção bruto (quanto maior, mais forte).
           </p>
+          <form method="get" className="mt-3 flex items-end gap-2">
+            <div>
+              <label htmlFor="n" className="block text-xs font-medium text-zinc-500">
+                Quantas ideias mostrar (1 a 30)
+              </label>
+              <input
+                id="n"
+                name="n"
+                type="number"
+                min={1}
+                max={30}
+                defaultValue={ideaCount}
+                className="mt-1 w-20 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Aplicar
+            </button>
+          </form>
           <ul className="mt-3 space-y-2">
-            {ideas.map((idea, i) => (
+            {ideas.slice(0, ideaCount).map((idea, i) => (
               <li
                 key={i}
                 className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[idea.conviction]}`}
@@ -94,7 +167,7 @@ export default async function ForexPage() {
                   <span
                     className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[idea.conviction]}`}
                   >
-                    {idea.conviction}
+                    {idea.conviction} ({idea.score.toFixed(2)})
                   </span>
                   <p className={`font-medium ${CONVICTION_TEXT[idea.conviction]}`}>{idea.title}</p>
                 </div>
@@ -191,7 +264,7 @@ export default async function ForexPage() {
       {!error && entradas.length > 0 && (
         <>
           <h2 className="mt-10 text-lg font-medium text-black dark:text-zinc-50">
-            5 entradas protegidas (pares assimétricos)
+            {Math.min(ideaCount, entradas.length)} entradas protegidas (pares assimétricos)
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
             Cada entrada usa 2 pernas que compartilham uma moeda comum em direções opostas —
@@ -199,10 +272,11 @@ export default async function ForexPage() {
             duas (ex: comprar EUR/USD + vender EUR/NZD protege o EUR e vira, na prática, uma
             aposta em NZD vs USD). Direção pelo viés diário/semanal — leia o timing de entrada
             no gráfico de 4h por conta própria (nossos dados são diários, não intradiários).
-            Heurística, não recomendação de investimento.
+            Usa a mesma caixinha de &quot;quantas ideias mostrar&quot; acima. Heurística, não
+            recomendação de investimento.
           </p>
           <ul className="mt-3 space-y-2">
-            {entradas.map((e, i) => (
+            {entradas.slice(0, ideaCount).map((e, i) => (
               <li
                 key={i}
                 className={`rounded-lg border p-3 text-sm ${CONVICTION_STYLE[e.conviction]}`}
@@ -211,7 +285,7 @@ export default async function ForexPage() {
                   <span
                     className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CONVICTION_BADGE[e.conviction]}`}
                   >
-                    {e.conviction}
+                    {e.conviction} ({e.score.toFixed(2)})
                   </span>
                   <p className={`font-medium ${CONVICTION_TEXT[e.conviction]}`}>
                     {e.legs[0].action} {e.legs[0].pair} + {e.legs[1].action} {e.legs[1].pair}

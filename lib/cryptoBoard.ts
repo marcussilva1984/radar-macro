@@ -11,6 +11,7 @@ export interface CryptoIdea {
   title: string;
   detail: string;
   conviction: Conviction;
+  score: number;
 }
 
 export interface NarrativeMention {
@@ -76,6 +77,7 @@ function buildIdeas(
         title: `BTC em ${dir} consistente (24h e 7d)`,
         detail: `24h ${btc.changePct24h.toFixed(2)}% e 7d ${btc.changePct7d.toFixed(2)}% na mesma direção — tendência de fundo, não só ruído do dia. Altcoins tendem a amplificar esse movimento.`,
         conviction: convictionOf(Math.abs(btc.changePct7d)),
+        score: Math.abs(btc.changePct7d),
       });
     }
   }
@@ -91,6 +93,7 @@ function buildIdeas(
         title: `Setor em alta: ${top.name} (+${top.marketCapChangePct24h.toFixed(2)}% em 24h)`,
         detail: `Market cap do setor subindo mais que o resto do mercado — força relativa, não é só BTC puxando tudo junto.`,
         conviction: convictionOf(top.marketCapChangePct24h),
+        score: top.marketCapChangePct24h,
       });
     }
     const bottom = sorted[sorted.length - 1];
@@ -99,6 +102,7 @@ function buildIdeas(
         title: `Setor em queda: ${bottom.name} (${bottom.marketCapChangePct24h.toFixed(2)}% em 24h)`,
         detail: `Fluxo saindo desse setor mais rápido que o mercado — cautela em posições compradas aqui.`,
         conviction: convictionOf(Math.abs(bottom.marketCapChangePct24h)),
+        score: Math.abs(bottom.marketCapChangePct24h),
       });
     }
   }
@@ -110,12 +114,14 @@ function buildIdeas(
         title: `Medo extremo (${fearGreed.value}/100) — ${fearGreed.classification}`,
         detail: `Historicamente zona de capitulação — contrários costumam ver como oportunidade, mas pode continuar caindo. Não é sinal de entrada isolado.`,
         conviction: "médio",
+        score: Math.abs(fearGreed.value - 50),
       });
     } else if (fearGreed.value >= 75) {
       ideas.push({
         title: `Ganância extrema (${fearGreed.value}/100) — ${fearGreed.classification}`,
         detail: `Historicamente zona de euforia — maior risco de correção abrupta. Bom momento pra revisar tamanho de posição.`,
         conviction: "médio",
+        score: Math.abs(fearGreed.value - 50),
       });
     }
   }
@@ -126,11 +132,12 @@ function buildIdeas(
       title: `Narrativa da semana: ${narrative[0].topic}`,
       detail: `"${narrative[0].topic}" apareceu em ${narrative[0].count} vídeos dos canais que você segue na última semana — é o que mais está sendo comentado agora.`,
       conviction: narrative[0].count >= 6 ? "forte" : "médio",
+      score: narrative[0].count,
     });
   }
 
   const order: Record<Conviction, number> = { forte: 0, médio: 1, fraco: 2 };
-  return ideas.sort((a, b) => order[a.conviction] - order[b.conviction]);
+  return ideas.sort((a, b) => order[a.conviction] - order[b.conviction] || b.score - a.score);
 }
 
 const TRACKED_COINS = [
@@ -144,6 +151,11 @@ const TRACKED_COINS = [
   "avalanche-2",
   "dogecoin",
   "sui",
+  "polkadot",
+  "near",
+  "aptos",
+  "arbitrum",
+  "optimism",
 ];
 
 export interface CryptoEntrada {
@@ -153,7 +165,7 @@ export interface CryptoEntrada {
   score: number;
 }
 
-const ENTRADA_SIGNAL_THRESHOLD = 1.5; // pp de força relativa vs BTC
+const ENTRADA_SIGNAL_THRESHOLD = 1; // pp de força relativa vs BTC
 const ENTRADA_STRONG_THRESHOLD = 5;
 
 function entradaConvictionOf(absScore: number): Conviction {
@@ -187,7 +199,7 @@ function buildEntradas(btc: CoinMarket | null, coins: CoinMarket[]): CryptoEntra
     });
   }
 
-  return entradas.sort((a, b) => b.score - a.score).slice(0, 6);
+  return entradas.sort((a, b) => b.score - a.score).slice(0, 30);
 }
 
 export async function getCryptoBoard(): Promise<{
