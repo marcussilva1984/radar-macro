@@ -79,7 +79,7 @@ function computeSinceLastUpdate(entries: BalanceEntry[]): SinceLastUpdateStats |
   };
 }
 
-// days: 1 a 30, escolhido por você na página (evita ter uma coluna fixa por janela).
+// days: 1 a 365, escolhido por você na página (evita ter uma coluna fixa por janela).
 export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]> {
   const rows = await db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate));
 

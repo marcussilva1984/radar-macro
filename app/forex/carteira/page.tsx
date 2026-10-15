@@ -62,7 +62,7 @@ export default async function CarteiraPage({
   searchParams: Promise<{ dias?: string }>;
 }) {
   const { dias } = await searchParams;
-  const days = Math.min(30, Math.max(1, Number(dias) || 7));
+  const days = Math.min(365, Math.max(1, Number(dias) || 7));
 
   let summaries: Awaited<ReturnType<typeof getBrokerSummaries>> = [];
   let entries: Awaited<ReturnType<typeof getAllEntries>> = [];
@@ -209,14 +209,14 @@ export default async function CarteiraPage({
           >
             <div>
               <label htmlFor="dias" className="block text-xs font-medium text-zinc-500">
-                Lucro dos últimos N dias (1 a 30)
+                Lucro dos últimos N dias (1 a 365)
               </label>
               <input
                 id="dias"
                 name="dias"
                 type="number"
                 min={1}
-                max={30}
+                max={365}
                 defaultValue={days}
                 className="mt-1 w-24 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
               />
