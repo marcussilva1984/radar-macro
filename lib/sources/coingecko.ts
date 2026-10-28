@@ -9,12 +9,16 @@ export interface CoinMarket {
   changePct7d: number | null;
 }
 
-// CoinGecko free API — sem chave, mas com rate limit agressivo (uso esporádico só).
+// CoinGecko free API — sem chave, mas com rate limit agressivo. Cacheado 60s: o ticker (site
+// inteiro) e a aba Cripto chamam isso em toda navegação, sem cache isso estoura o rate limit
+// rapidinho com qualquer uso um pouco mais frequente.
+const CACHE_SECONDS = 60;
+
 export async function getCoinMarkets(ids: string[]): Promise<CoinMarket[]> {
   try {
     const res = await fetch(
       `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(",")}&price_change_percentage=24h,7d`,
-      { next: { revalidate: 0 } }
+      { next: { revalidate: CACHE_SECONDS } }
     );
     if (!res.ok) return [];
     const data = await res.json();
@@ -42,7 +46,9 @@ export interface CoinCategory {
 // "Força do setor" — market cap médio ponderado por categoria (L1, DeFi, Memecoin, AI etc).
 export async function getCoinCategories(): Promise<CoinCategory[]> {
   try {
-    const res = await fetch("https://api.coingecko.com/api/v3/coins/categories", { next: { revalidate: 0 } });
+    const res = await fetch("https://api.coingecko.com/api/v3/coins/categories", {
+      next: { revalidate: CACHE_SECONDS },
+    });
     if (!res.ok) return [];
     const data = await res.json();
     return (data as Record<string, unknown>[]).map((c) => ({

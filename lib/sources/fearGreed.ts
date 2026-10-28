@@ -9,7 +9,8 @@ export interface FearGreed {
 // Índice de Medo e Ganância de cripto (alternative.me, público, sem chave, atualiza 1x/dia).
 export async function getFearGreedIndex(): Promise<FearGreed | null> {
   try {
-    const res = await fetch("https://api.alternative.me/fng/?limit=1", { next: { revalidate: 0 } });
+    // Atualiza só 1x/dia na fonte — 5 min de cache aqui já evita bater à toa a cada navegação.
+    const res = await fetch("https://api.alternative.me/fng/?limit=1", { next: { revalidate: 300 } });
     if (!res.ok) return null;
     const data = await res.json();
     const item = data?.data?.[0];

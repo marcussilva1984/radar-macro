@@ -54,13 +54,14 @@ export interface LiveQuote {
 }
 
 // Cotação "ao vivo" (delay natural da fonte gratuita, sem chave) via o campo meta do próprio
-// endpoint de chart — não precisa de um endpoint de quote separado.
+// endpoint de chart — não precisa de um endpoint de quote separado. Cacheado 60s: o ticker
+// (site inteiro) chama isso em toda navegação, sem cache a fonte gratuita começa a bloquear.
 export async function fetchLiveQuote(yahooSymbol: string): Promise<LiveQuote | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1d&interval=5m`;
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; radar-macro/0.1)" },
-      next: { revalidate: 0 },
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as YahooMetaResult;

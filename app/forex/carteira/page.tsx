@@ -118,6 +118,38 @@ export default async function CarteiraPage({
           };
         })();
 
+  const now = new Date();
+  const dayOfMonth = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeftInMonth = daysInMonth - dayOfMonth;
+
+  const insights: string[] = [];
+  const withPeriod = summaries.filter((s): s is typeof s & { period: PeriodStats } => s.period !== null);
+  if (withPeriod.length > 0) {
+    const best = withPeriod.reduce((a, b) => (b.period.profitPct > a.period.profitPct ? b : a));
+    const worst = withPeriod.reduce((a, b) => (b.period.profitPct < a.period.profitPct ? b : a));
+    if (best.broker !== worst.broker) {
+      insights.push(
+        `Melhor corretora nos últimos ${days} dia${days > 1 ? "s" : ""}: ${best.broker} (${best.period.profitPct >= 0 ? "+" : ""}${best.period.profitPct.toFixed(1)}%). Pior: ${worst.broker} (${worst.period.profitPct >= 0 ? "+" : ""}${worst.period.profitPct.toFixed(1)}%).`
+      );
+    }
+  }
+  if (monthProgress) {
+    const expectedPct = 2; // referência: meta padrão de 2%/mês usada no simulador
+    const proRata = (expectedPct * monthProgress.daysElapsed) / monthProgress.daysInMonth;
+    const base = monthProgress.baseBalance || 1;
+    const actualPct = (monthProgress.profit / base) * 100;
+    const diff = actualPct - proRata;
+    insights.push(
+      `Faltam ${daysLeftInMonth} dia${daysLeftInMonth !== 1 ? "s" : ""} pro fim do mês. No ritmo atual você está ${diff >= 0 ? "à frente" : "atrás"} de uma meta de 2%/mês em ${Math.abs(diff).toFixed(1)}pp (ajuste a meta real na seção "Metas do mês" abaixo).`
+    );
+  }
+  if (totalPeriod) {
+    insights.push(
+      `Patrimônio total em forex: ${money(totalBalance)}, ${totalPeriod.profit >= 0 ? "lucro" : "prejuízo"} de ${money(Math.abs(totalPeriod.profit))} (${totalPeriod.profitPct >= 0 ? "+" : ""}${totalPeriod.profitPct.toFixed(1)}%) nos últimos ${days} dias.`
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Carteira</h1>
@@ -142,18 +174,34 @@ export default async function CarteiraPage({
           </div>
 
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
-            Metas do mês
-          </h2>
-          <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <MonthGoalPanel entries={entries} brokers={BROKERS} />
-          </div>
-
-          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
             Evolução do saldo
           </h2>
           <p className="mt-1 text-xs text-zinc-500">Saldo total e por corretora ao longo do tempo.</p>
           <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <BalanceChart entries={entries} brokers={BROKERS} />
+          </div>
+
+          {insights.length > 0 && (
+            <>
+              <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">Insights</h2>
+              <ul className="mt-3 space-y-2">
+                {insights.map((text, i) => (
+                  <li
+                    key={i}
+                    className="rounded-lg border border-zinc-200 bg-white p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+                  >
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
+            Metas do mês
+          </h2>
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <MonthGoalPanel entries={entries} brokers={BROKERS} />
           </div>
 
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">
@@ -227,6 +275,12 @@ export default async function CarteiraPage({
             >
               Aplicar
             </button>
+            <a
+              href={`?dias=${dayOfMonth}`}
+              className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              Mês atual (dia 1 a hoje)
+            </a>
           </form>
 
           <div className="mt-6 overflow-x-auto">
