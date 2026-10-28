@@ -6,6 +6,7 @@ import { getB3Ideas } from "@/lib/b3Ideas";
 import { db } from "@/lib/db/client";
 import { youtubeVideos } from "@/lib/db/schema";
 import { and, eq, gte } from "drizzle-orm";
+import { getBrokerSummaries, getMonthToDateStats, type PeriodStats } from "@/lib/brokerPortfolio";
 
 export const maxDuration = 60;
 
@@ -38,6 +39,37 @@ export async function GET(req: Request) {
         );
         telegramSent = true;
       }
+      // Resumo semanal da Carteira Forex — saldo total, lucro da semana e ritmo vs meta
+      // mensal de referência (2%/mês, mesma usada nos Insights da página).
+      try {
+        const summaries = await getBrokerSummaries(7);
+        const totalBalance = summaries.reduce((acc, s) => acc + (s.currentBalance ?? 0), 0);
+        const withPeriod = summaries.map((s) => s.period).filter((p): p is PeriodStats => p !== null);
+        if (withPeriod.length > 0) {
+          const profit = withPeriod.reduce((acc, p) => acc + p.profit, 0);
+          const base = totalBalance - profit;
+          const profitPct = base > 0 ? (profit / base) * 100 : 0;
+
+          const monthProgress = await getMonthToDateStats();
+          let ritmoLine = "";
+          if (monthProgress) {
+            const proRata = (2 * monthProgress.daysElapsed) / monthProgress.daysInMonth;
+            const actualPct = monthProgress.baseBalance > 0 ? (monthProgress.profit / monthProgress.baseBalance) * 100 : 0;
+            const diff = actualPct - proRata;
+            ritmoLine = `\nRitmo do mês: ${diff >= 0 ? "à frente" : "atrás"} da meta de 2%/mês em ${Math.abs(diff).toFixed(1)}pp.`;
+          }
+
+          await sendTelegramMessage(
+            `<b>Radar Macro — resumo semanal da Carteira Forex</b>\n` +
+              `Saldo total: $${totalBalance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}\n` +
+              `Lucro da semana: $${profit.toFixed(2)} (${profitPct >= 0 ? "+" : ""}${profitPct.toFixed(1)}%)${ritmoLine}`
+          );
+          telegramSent = true;
+        }
+      } catch {
+        // sem lançamentos suficientes ainda, ou falha pontual — não quebra o resumo semanal
+      }
+
       // Canais novos descobertos na semana — agrega os vídeos "não seguido" (de canais fora
       // da sua lista de inscrições) num bloco só, em vez de você revisar um por um todo dia.
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
