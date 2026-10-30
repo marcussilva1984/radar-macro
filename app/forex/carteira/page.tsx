@@ -10,6 +10,9 @@ import {
 } from "@/lib/brokerPortfolio";
 import { BrokerBalanceForm } from "@/app/components/BrokerBalanceForm";
 import { redirect } from "next/navigation";
+import { getForexBoard } from "@/lib/forex";
+import { buildCarryIdeas } from "@/lib/carryTrades";
+import { CarrySidebar } from "@/app/components/CarryTrades";
 import { brToday } from "@/lib/brTime";
 import { requestIsCarteiraAuthorized } from "@/lib/carteiraAuth";
 import { PortfolioSimulator } from "@/app/components/PortfolioSimulator";
@@ -87,6 +90,11 @@ export default async function CarteiraPage({
   } catch (e) {
     error = (e as Error).message;
   }
+
+  // Dicas de carry na barra lateral — se o board de Forex falhar, a Carteira continua funcionando.
+  const carryIdeas = await getForexBoard()
+    .then((b) => buildCarryIdeas(b.signals))
+    .catch(() => []);
 
   const totalBalance = summaries.reduce((acc, s) => acc + (s.currentBalance ?? 0), 0);
   const withData = summaries.map((s) => s.period).filter((p): p is PeriodStats => p !== null);
@@ -179,7 +187,8 @@ export default async function CarteiraPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
+    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0">
       <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Carteira</h1>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
         Saldo das suas corretoras de forex (preenchimento manual). Lucro descontando
@@ -432,6 +441,13 @@ export default async function CarteiraPage({
 
           <PortfolioSimulator initialBalance={totalBalance} monthProgress={monthProgress} />
         </>
+      )}
+      </div>
+
+      {carryIdeas.length > 0 && (
+        <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto">
+          <CarrySidebar ideas={carryIdeas} />
+        </div>
       )}
     </div>
   );

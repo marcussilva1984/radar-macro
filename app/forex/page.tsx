@@ -2,6 +2,8 @@ import { getForexBoard } from "@/lib/forex";
 import { POLICY_RATES_UPDATED_AT } from "@/lib/sources/policyRates";
 import { getDxyQuote, getMainFxQuotes } from "@/lib/liveQuotes";
 import Link from "next/link";
+import { buildCarryIdeas } from "@/lib/carryTrades";
+import { CarryTradesPanel } from "@/app/components/CarryTrades";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +70,7 @@ export default async function ForexPage({
   const [dxy, mainFx] = await Promise.all([getDxyQuote(), getMainFxQuotes()]);
 
   const maxStrength = Math.max(0.01, ...strength.map((s) => Math.abs(s.score)));
+  const carryIdeas = buildCarryIdeas(signals);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -95,6 +98,13 @@ export default async function ForexPage({
             </span>
           </div>
         </div>
+      )}
+
+      {carryIdeas.length > 0 && (
+        <>
+          <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">Carry trades agora</h2>
+          <CarryTradesPanel ideas={carryIdeas} />
+        </>
       )}
 
       {mainFx.length > 0 && (
