@@ -157,6 +157,21 @@ export default async function CarteiraPage({
         : `Pra bater a meta do mês (${money(goalUsd)}) faltam ${money(missingUsd)}${daysLeftInMonth > 0 ? ` — cerca de ${money(missingUsd / daysLeftInMonth)} por dia até o fim do mês` : ""}.`
     );
   }
+  const monthSummary = monthProgress
+    ? (() => {
+        const base = monthProgress.baseBalance || 1;
+        const pct = (monthProgress.profit / base) * 100;
+        const goalUsd = (base * goalPct) / 100;
+        return {
+          profit: monthProgress.profit,
+          pct,
+          goalUsd,
+          missing: goalUsd - monthProgress.profit,
+          progress: goalPct > 0 ? Math.max(0, Math.min(100, (pct / goalPct) * 100)) : 0,
+        };
+      })()
+    : null;
+
   if (totalPeriod) {
     insights.push(
       `Patrimônio total em forex: ${money(totalBalance)}, ${totalPeriod.profit >= 0 ? "lucro" : "prejuízo"} de ${money(Math.abs(totalPeriod.profit))} (${totalPeriod.profitPct >= 0 ? "+" : ""}${totalPeriod.profitPct.toFixed(1)}%) nos últimos ${days} dias.`
@@ -179,6 +194,50 @@ export default async function CarteiraPage({
 
       {!error && (
         <>
+          {monthSummary && (
+            <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Resultado do mês (dia 1 a {dayOfMonth}/{daysInMonth})
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-zinc-500">Lucro no mês</p>
+                  <p className={`text-2xl font-semibold ${pctColor(monthSummary.profit)}`}>
+                    {monthSummary.profit >= 0 ? "+" : "-"}
+                    {money(Math.abs(monthSummary.profit))}
+                  </p>
+                  <p className={`text-sm ${pctColor(monthSummary.pct)}`}>
+                    {monthSummary.pct >= 0 ? "+" : ""}
+                    {monthSummary.pct.toFixed(2)}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500">Meta ({goalPct}%)</p>
+                  <p className="text-2xl font-semibold text-black dark:text-zinc-50">{money(monthSummary.goalUsd)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500">{monthSummary.missing > 0 ? "Falta" : "Acima da meta"}</p>
+                  <p className={`text-2xl font-semibold ${monthSummary.missing > 0 ? "text-black dark:text-zinc-50" : "text-green-600 dark:text-green-400"}`}>
+                    {money(Math.abs(monthSummary.missing))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500">Saldo total</p>
+                  <p className="text-2xl font-semibold text-black dark:text-zinc-50">{money(totalBalance)}</p>
+                </div>
+              </div>
+              <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                <div
+                  className={`h-full rounded-full ${monthSummary.missing <= 0 ? "bg-green-500" : "bg-blue-500"}`}
+                  style={{ width: `${monthSummary.progress}%` }}
+                />
+              </div>
+              <p className="mt-1 text-right text-xs text-zinc-500">
+                {monthSummary.progress.toFixed(0)}% da meta · faltam {daysLeftInMonth} dia{daysLeftInMonth !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
+
           <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <p className="text-xs font-medium text-zinc-500">Novo lançamento</p>
             <div className="mt-2">
