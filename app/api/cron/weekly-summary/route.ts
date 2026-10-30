@@ -6,7 +6,7 @@ import { getB3Ideas } from "@/lib/b3Ideas";
 import { db } from "@/lib/db/client";
 import { youtubeVideos } from "@/lib/db/schema";
 import { and, eq, gte } from "drizzle-orm";
-import { getBrokerSummaries, getMonthToDateStats, type PeriodStats } from "@/lib/brokerPortfolio";
+import { getBrokerSummaries, getMonthToDateStats, getMonthlyGoalPct, type PeriodStats } from "@/lib/brokerPortfolio";
 
 export const maxDuration = 60;
 
@@ -50,13 +50,13 @@ export async function GET(req: Request) {
           const base = totalBalance - profit;
           const profitPct = base > 0 ? (profit / base) * 100 : 0;
 
-          const monthProgress = await getMonthToDateStats();
+          const [monthProgress, goalPct] = await Promise.all([getMonthToDateStats(), getMonthlyGoalPct()]);
           let ritmoLine = "";
           if (monthProgress) {
-            const proRata = (2 * monthProgress.daysElapsed) / monthProgress.daysInMonth;
+            const proRata = (goalPct * monthProgress.daysElapsed) / monthProgress.daysInMonth;
             const actualPct = monthProgress.baseBalance > 0 ? (monthProgress.profit / monthProgress.baseBalance) * 100 : 0;
             const diff = actualPct - proRata;
-            ritmoLine = `\nRitmo do mês: ${diff >= 0 ? "à frente" : "atrás"} da meta de 2%/mês em ${Math.abs(diff).toFixed(1)}pp.`;
+            ritmoLine = `\nRitmo do mês: ${diff >= 0 ? "à frente" : "atrás"} da sua meta de ${goalPct}%/mês em ${Math.abs(diff).toFixed(1)}pp.`;
           }
 
           await sendTelegramMessage(

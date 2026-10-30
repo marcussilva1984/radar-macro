@@ -135,3 +135,11 @@ export const brokerBalances = pgTable(
     uniqueIndex("broker_balances_broker_date_unique").on(t.broker, t.entryDate),
   ]
 );
+
+// Configurações da aba Carteira (linha única, id=1) — hoje só a meta mensal de rendimento,
+// usada pelo painel "Metas do mês", pelos Insights e pelo resumo semanal do Telegram.
+export const carteiraSettings = pgTable("carteira_settings", {
+  id: serial("id").primaryKey(),
+  monthlyGoalPct: doublePrecision("monthly_goal_pct").notNull().default(2),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -1,7 +1,21 @@
 import "server-only";
 import { db } from "@/lib/db/client";
-import { brokerBalances } from "@/lib/db/schema";
+import { brokerBalances, carteiraSettings } from "@/lib/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
+
+export const DEFAULT_MONTHLY_GOAL_PCT = 2;
+
+export async function getMonthlyGoalPct(): Promise<number> {
+  const rows = await db.select().from(carteiraSettings).where(eq(carteiraSettings.id, 1)).limit(1);
+  return rows[0]?.monthlyGoalPct ?? DEFAULT_MONTHLY_GOAL_PCT;
+}
+
+export async function setMonthlyGoalPct(pct: number): Promise<void> {
+  await db
+    .insert(carteiraSettings)
+    .values({ id: 1, monthlyGoalPct: pct, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: carteiraSettings.id, set: { monthlyGoalPct: pct, updatedAt: new Date() } });
+}
 
 export const BROKERS = ["EBC", "AXI", "ICMarkets", "FBS"] as const;
 export type Broker = (typeof BROKERS)[number];

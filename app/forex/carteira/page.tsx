@@ -2,6 +2,8 @@ import {
   getBrokerSummaries,
   getAllEntries,
   getMonthToDateStats,
+  getMonthlyGoalPct,
+  DEFAULT_MONTHLY_GOAL_PCT,
   BROKERS,
   type PeriodStats,
   type SinceLastUpdateStats,
@@ -67,13 +69,15 @@ export default async function CarteiraPage({
   let summaries: Awaited<ReturnType<typeof getBrokerSummaries>> = [];
   let entries: Awaited<ReturnType<typeof getAllEntries>> = [];
   let monthProgress: Awaited<ReturnType<typeof getMonthToDateStats>> = null;
+  let goalPct = DEFAULT_MONTHLY_GOAL_PCT;
   let error: string | null = null;
 
   try {
-    [summaries, entries, monthProgress] = await Promise.all([
+    [summaries, entries, monthProgress, goalPct] = await Promise.all([
       getBrokerSummaries(days),
       getAllEntries(),
       getMonthToDateStats(),
+      getMonthlyGoalPct(),
     ]);
   } catch (e) {
     error = (e as Error).message;
@@ -135,13 +139,19 @@ export default async function CarteiraPage({
     }
   }
   if (monthProgress) {
-    const expectedPct = 2; // referência: meta padrão de 2%/mês usada no simulador
-    const proRata = (expectedPct * monthProgress.daysElapsed) / monthProgress.daysInMonth;
+    const proRata = (goalPct * monthProgress.daysElapsed) / monthProgress.daysInMonth;
     const base = monthProgress.baseBalance || 1;
     const actualPct = (monthProgress.profit / base) * 100;
     const diff = actualPct - proRata;
+    const goalUsd = (base * goalPct) / 100;
+    const missingUsd = goalUsd - monthProgress.profit;
     insights.push(
-      `Faltam ${daysLeftInMonth} dia${daysLeftInMonth !== 1 ? "s" : ""} pro fim do mês. No ritmo atual você está ${diff >= 0 ? "à frente" : "atrás"} de uma meta de 2%/mês em ${Math.abs(diff).toFixed(1)}pp (ajuste a meta real na seção "Metas do mês" abaixo).`
+      `Faltam ${daysLeftInMonth} dia${daysLeftInMonth !== 1 ? "s" : ""} pro fim do mês. Você está ${diff >= 0 ? "à frente" : "atrás"} da sua meta de ${goalPct}%/mês em ${Math.abs(diff).toFixed(1)}pp.`
+    );
+    insights.push(
+      missingUsd <= 0
+        ? `Meta do mês (${money(goalUsd)}) já batida — ${money(-missingUsd)} acima.`
+        : `Pra bater a meta do mês (${money(goalUsd)}) faltam ${money(missingUsd)}${daysLeftInMonth > 0 ? ` — cerca de ${money(missingUsd / daysLeftInMonth)} por dia até o fim do mês` : ""}.`
     );
   }
   if (totalPeriod) {
@@ -201,7 +211,7 @@ export default async function CarteiraPage({
             Metas do mês
           </h2>
           <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <MonthGoalPanel entries={entries} brokers={BROKERS} />
+            <MonthGoalPanel entries={entries} brokers={BROKERS} initialGoalPct={goalPct} />
           </div>
 
           <h2 className="mt-8 text-lg font-medium text-black dark:text-zinc-50">

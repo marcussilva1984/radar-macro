@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { BalanceEntry } from "@/lib/brokerPortfolio";
 
 function pct(v: number) {
@@ -43,9 +44,35 @@ function periodReturn(
   return { profit: totalProfit, base: totalBase, pct: totalBase > 0 ? (totalProfit / totalBase) * 100 : 0 };
 }
 
-export function MonthGoalPanel({ entries, brokers }: { entries: BalanceEntry[]; brokers: readonly string[] }) {
-  const [goalPct, setGoalPct] = useState("2");
+export function MonthGoalPanel({
+  entries,
+  brokers,
+  initialGoalPct,
+}: {
+  entries: BalanceEntry[];
+  brokers: readonly string[];
+  initialGoalPct: number;
+}) {
+  const router = useRouter();
+  const [goalPct, setGoalPct] = useState(String(initialGoalPct));
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const goalVal = Number(goalPct) || 0;
+
+  async function saveGoal() {
+    setSaveStatus("saving");
+    try {
+      const res = await fetch("/api/carteira/meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthlyGoalPct: goalVal }),
+      });
+      if (!res.ok) throw new Error();
+      setSaveStatus("saved");
+      router.refresh();
+    } catch {
+      setSaveStatus("error");
+    }
+  }
 
   const now = new Date();
   const year = now.getFullYear();
@@ -85,9 +112,23 @@ export function MonthGoalPanel({ entries, brokers }: { entries: BalanceEntry[]; 
             type="number"
             step="0.1"
             value={goalPct}
-            onChange={(e) => setGoalPct(e.target.value)}
+            onChange={(e) => {
+              setGoalPct(e.target.value);
+              setSaveStatus("idle");
+            }}
             className="mt-1 w-20 rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-black dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
           />
+        </div>
+        <div className="self-end">
+          <button
+            onClick={saveGoal}
+            disabled={saveStatus === "saving" || goalVal === initialGoalPct}
+            className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+          >
+            {saveStatus === "saving" ? "Salvando…" : "Salvar meta"}
+          </button>
+          {saveStatus === "saved" && <span className="ml-2 text-xs text-green-600 dark:text-green-400">Salva!</span>}
+          {saveStatus === "error" && <span className="ml-2 text-xs text-red-600 dark:text-red-400">Erro</span>}
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Meta: <span className="font-medium text-black dark:text-zinc-50">{pct(goalVal)}</span> no mês
@@ -102,7 +143,6 @@ export function MonthGoalPanel({ entries, brokers }: { entries: BalanceEntry[]; 
             Feito: {pct(doneActualPct)}
           </span>
           <span className={diff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-            {diff >= 0 ? "+" : ""}
             {pct(diff)} {diff >= 0 ? "à frente" : "atrás"} da meta pró-rata
           </span>
         </div>
