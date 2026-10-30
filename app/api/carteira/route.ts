@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       `⚠️ <b>Drawdown na Carteira — ${broker}</b>\n` +
         `${sign}$${sinceLastUpdate.profit.toFixed(2)} (${sinceLastUpdate.profitPct.toFixed(1)}%) ` +
         `em ${sinceLastUpdate.days} dia${sinceLastUpdate.days > 1 ? "s" : ""}`
-    ).catch(() => {});
+    ).catch((err) => console.error("carteira: falha ao enviar alerta de drawdown", err));
   }
 
   return NextResponse.json({ ok: true });

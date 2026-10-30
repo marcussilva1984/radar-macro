@@ -18,7 +18,7 @@ export const maxDuration = 300;
 // diferente do check de inscrições (barato, 8x/dia em /api/cron/ingest-youtube).
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!(await isYoutubeConnected())) {

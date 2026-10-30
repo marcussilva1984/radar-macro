@@ -23,12 +23,17 @@ export function getOAuthClient() {
   return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri());
 }
 
-export function getAuthUrl(): string {
+// Cookie com o `state` aleatório do fluxo OAuth — impede que alguém complete o login com a
+// conta Google dele e troque o token salvo pelo dele (login CSRF).
+export const YT_STATE_COOKIE = "yt_oauth_state";
+
+export function getAuthUrl(state: string): string {
   const client = getOAuthClient();
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent", // força retornar refresh_token mesmo se já autorizou antes
     scope: YOUTUBE_SCOPES,
+    state,
   });
 }
 

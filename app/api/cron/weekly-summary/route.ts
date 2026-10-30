@@ -12,7 +12,7 @@ export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -66,8 +66,8 @@ export async function GET(req: Request) {
           );
           telegramSent = true;
         }
-      } catch {
-        // sem lançamentos suficientes ainda, ou falha pontual — não quebra o resumo semanal
+      } catch (err) {
+        console.error("weekly-summary: falha no bloco da Carteira", err);
       }
 
       // Canais novos descobertos na semana — agrega os vídeos "não seguido" (de canais fora
@@ -89,8 +89,10 @@ export async function GET(req: Request) {
         );
         telegramSent = true;
       }
-    } catch {
-      // Telegram é best-effort — não quebra o resumo semanal se falhar.
+    } catch (err) {
+      // O resumo já foi salvo; 500 só pra falha do Telegram aparecer como erro no painel do cron.
+      console.error("weekly-summary: falha ao enviar Telegram", err);
+      return NextResponse.json({ ok: false, summary, telegramError: (err as Error).message }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, summary, telegramSent });

@@ -1,4 +1,5 @@
 import type { BalanceEntry } from "@/lib/brokerPortfolio";
+import { brMonthKey } from "@/lib/brTime";
 
 function money(v: number) {
   return `$${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
@@ -9,7 +10,7 @@ function pct(v: number) {
 
 function monthReturn(entries: BalanceEntry[], broker: string, month: string) {
   const bEntries = entries.filter((e) => e.broker === broker).sort((a, b) => a.entryDate.getTime() - b.entryDate.getTime());
-  const monthKey = (d: Date) => d.toISOString().slice(0, 7);
+  const monthKey = brMonthKey;
   const monthEntries = bEntries.filter((e) => monthKey(e.entryDate) === month);
   if (monthEntries.length === 0) return null;
 
@@ -25,7 +26,7 @@ function monthReturn(entries: BalanceEntry[], broker: string, month: string) {
 }
 
 export function MonthlyPnL({ entries, brokers }: { entries: BalanceEntry[]; brokers: readonly string[] }) {
-  const months = Array.from(new Set(entries.map((e) => e.entryDate.toISOString().slice(0, 7)))).sort().reverse();
+  const months = Array.from(new Set(entries.map((e) => brMonthKey(e.entryDate)))).sort().reverse();
   if (months.length === 0) return <p className="text-sm text-zinc-500">Sem dados mensais ainda.</p>;
 
   function totalReturn(month: string) {
@@ -34,7 +35,7 @@ export function MonthlyPnL({ entries, brokers }: { entries: BalanceEntry[]; brok
     const totalProfit = results.reduce((s, r) => s + r.profit, 0);
     let base = 0;
     for (const b of brokers) {
-      const before = entries.filter((e) => e.broker === b && e.entryDate.toISOString().slice(0, 7) < month);
+      const before = entries.filter((e) => e.broker === b && brMonthKey(e.entryDate) < month);
       if (before.length > 0) base += before.sort((a, z) => z.entryDate.getTime() - a.entryDate.getTime())[0].balance;
     }
     return { profit: totalProfit, pct: base > 0 ? (totalProfit / base) * 100 : 0 };

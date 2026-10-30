@@ -47,7 +47,11 @@ const NARRATIVE_TERMS: { topic: string; pattern: RegExp }[] = [
 
 async function getWeeklyNarrative(): Promise<NarrativeMention[]> {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const rows = await db.select().from(youtubeVideos).where(gte(youtubeVideos.publishedAt, since));
+  const rows = await db
+    .select({ title: youtubeVideos.title })
+    .from(youtubeVideos)
+    .where(gte(youtubeVideos.publishedAt, since))
+    .limit(2000);
 
   const counts = new Map<string, number>();
   for (const { topic, pattern } of NARRATIVE_TERMS) {

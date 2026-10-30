@@ -19,7 +19,7 @@ export const maxDuration = 300;
 // por isso roda com mais frequência (8x/dia) que a descoberta por tema (2x/dia, mais cara).
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!(await isYoutubeConnected())) {

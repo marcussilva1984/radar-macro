@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { brMidnight, brToday } from "@/lib/brTime";
 import type { BalanceEntry } from "@/lib/brokerPortfolio";
 
 function pct(v: number) {
@@ -74,16 +75,12 @@ export function MonthGoalPanel({
     }
   }
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysElapsed = now.getDate();
-  const monthStart = new Date(year, month, 1);
-  // Entradas são gravadas com T12:00:00Z (meio-dia UTC) — se o request rodar antes do
-  // meio-dia UTC, comparar direto com `now` excluiria o lançamento de hoje. Usa o fim do dia
-  // de hoje como limite em vez do segundo exato atual.
-  const periodEnd = new Date(year, month, now.getDate() + 1);
+  // Datas no horário de Brasília (o servidor roda em UTC e renderiza esse componente também).
+  const { year, month, day: daysElapsed, daysInMonth } = brToday();
+  const monthStart = brMidnight(year, month, 1);
+  // Fim do dia de hoje como limite (não o segundo atual) — os lançamentos são gravados com
+  // horário fixo e seriam excluídos dependendo da hora do acesso.
+  const periodEnd = brMidnight(year, month, daysElapsed + 1);
 
   const monthDone = periodReturn(entries, brokers, monthStart, periodEnd);
   const proRataPct = (goalVal * daysElapsed) / daysInMonth;
@@ -94,10 +91,10 @@ export function MonthGoalPanel({
   // 4 janelas quase iguais dividindo o mês corrente — "Semana 1..4".
   const weekWidth = Math.ceil(daysInMonth / 4);
   const weeks = [0, 1, 2, 3].map((i) => {
-    const startDay = i * weekWidth;
+    const startDay = i * weekWidth + 1;
     const endDay = Math.min(daysInMonth, (i + 1) * weekWidth);
-    const start = new Date(year, month, startDay); // dia 0 do mês = último dia do mês anterior, cobre a borda
-    const end = new Date(year, month, endDay, 23, 59, 59);
+    const start = brMidnight(year, month, startDay);
+    const end = brMidnight(year, month, endDay + 1);
     const r = periodReturn(entries, brokers, start, end);
     const weekGoal = goalVal / 4;
     return { label: `Semana ${i + 1}`, r, weekGoal };

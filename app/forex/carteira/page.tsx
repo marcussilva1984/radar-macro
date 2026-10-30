@@ -10,6 +10,7 @@ import {
 } from "@/lib/brokerPortfolio";
 import { BrokerBalanceForm } from "@/app/components/BrokerBalanceForm";
 import { redirect } from "next/navigation";
+import { brToday } from "@/lib/brTime";
 import { requestIsCarteiraAuthorized } from "@/lib/carteiraAuth";
 import { PortfolioSimulator } from "@/app/components/PortfolioSimulator";
 import { BalanceChart } from "@/app/components/BalanceChart";
@@ -126,9 +127,7 @@ export default async function CarteiraPage({
           };
         })();
 
-  const now = new Date();
-  const dayOfMonth = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const { day: dayOfMonth, daysInMonth } = brToday();
   const daysLeftInMonth = daysInMonth - dayOfMonth;
 
   const insights: string[] = [];

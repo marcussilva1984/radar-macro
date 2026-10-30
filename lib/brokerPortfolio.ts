@@ -1,7 +1,9 @@
 import "server-only";
 import { db } from "@/lib/db/client";
 import { brokerBalances, carteiraSettings } from "@/lib/db/schema";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
+import { cache } from "react";
+import { brMidnight, brToday } from "@/lib/brTime";
 
 export const DEFAULT_MONTHLY_GOAL_PCT = 2;
 
@@ -52,9 +54,8 @@ export interface BrokerSummary {
 // Lucro de um período = variação do saldo, descontando aportes e somando de volta saques —
 // senão um depósito grande pareceria "lucro" e um saque pareceria "prejuízo". Também devolve
 // o total depositado/sacado no período, pra você ver quando fez cada coisa.
-function computePeriod(entries: BalanceEntry[], sinceDays: number): PeriodStats | null {
+function computePeriod(entries: BalanceEntry[], cutoff: Date): (PeriodStats & { baselineBalance: number }) | null {
   if (entries.length === 0) return null;
-  const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
   const last = entries[entries.length - 1];
 
   // Baseline: a última entrada ANTES do corte (se não houver, usa a mais antiga disponível —
@@ -68,8 +69,14 @@ function computePeriod(entries: BalanceEntry[], sinceDays: number): PeriodStats 
   const withdrawals = between.reduce((acc, e) => acc + e.withdrawal, 0);
   const profit = last.balance - baseline.balance - deposits + withdrawals;
   const base = baseline.balance || 1;
-  return { profit, profitPct: (profit / base) * 100, deposits, withdrawals };
+  return { profit, profitPct: (profit / base) * 100, deposits, withdrawals, baselineBalance: baseline.balance };
 }
+
+// Uma leitura da tabela por request (React cache) — a página da Carteira chamava 3 funções
+// que liam a tabela inteira cada uma.
+const loadBalancesAsc = cache(async (): Promise<BalanceEntry[]> =>
+  db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate))
+);
 
 // Lucro entre os dois últimos lançamentos — o que importa quando você não atualiza todo dia:
 // não precisa escolher uma janela, é sempre "desde a última vez que você mexeu no saldo".
@@ -95,7 +102,8 @@ function computeSinceLastUpdate(entries: BalanceEntry[]): SinceLastUpdateStats |
 
 // days: 1 a 365, escolhido por você na página (evita ter uma coluna fixa por janela).
 export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]> {
-  const rows = await db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate));
+  const rows = await loadBalancesAsc();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
   return BROKERS.map((broker) => {
     const entries = rows.filter((r) => r.broker === broker);
@@ -107,7 +115,7 @@ export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]>
       broker,
       currentBalance: last.balance,
       lastEntryDate: last.entryDate,
-      period: computePeriod(entries, days),
+      period: computePeriod(entries, cutoff),
       sinceLastUpdate: computeSinceLastUpdate(entries),
     };
   });
@@ -116,7 +124,7 @@ export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]>
 // Todos os lançamentos de todas as corretoras, mais recente primeiro — o "extrato" de quando
 // cada depósito/retirada/atualização de saldo foi feita.
 export async function getAllEntries(): Promise<BalanceEntry[]> {
-  return db.select().from(brokerBalances).orderBy(desc(brokerBalances.entryDate));
+  return [...(await loadBalancesAsc())].reverse();
 }
 
 export async function getHistory(broker: string): Promise<BalanceEntry[]> {
@@ -178,27 +186,26 @@ export async function getMonthToDateStats(): Promise<{
   daysElapsed: number;
   daysInMonth: number;
 } | null> {
-  const now = new Date();
-  const daysElapsed = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  // Mês de calendário em Brasília: baseline = último lançamento antes da meia-noite do dia 1
+  // (antes era "últimos N dias a partir de agora", que no dia 1 pegava o fim do mês anterior).
+  const today = brToday();
+  const monthStart = brMidnight(today.year, today.month, 1);
 
-  const rows = await db.select().from(brokerBalances).orderBy(asc(brokerBalances.entryDate));
+  const rows = await loadBalancesAsc();
   let totalProfit = 0;
-  let totalBalance = 0;
+  let totalBase = 0;
   let hasAny = false;
 
   for (const broker of BROKERS) {
     const entries = rows.filter((r) => r.broker === broker);
-    if (entries.length === 0) continue;
-    const last = entries[entries.length - 1];
-    totalBalance += last.balance;
-    const period = computePeriod(entries, daysElapsed);
+    const period = computePeriod(entries, monthStart);
     if (period) {
       totalProfit += period.profit;
+      totalBase += period.baselineBalance;
       hasAny = true;
     }
   }
 
   if (!hasAny) return null;
-  return { profit: totalProfit, baseBalance: totalBalance - totalProfit, daysElapsed, daysInMonth };
+  return { profit: totalProfit, baseBalance: totalBase, daysElapsed: today.day, daysInMonth: today.daysInMonth };
 }

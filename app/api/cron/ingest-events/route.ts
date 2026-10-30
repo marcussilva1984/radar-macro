@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -68,8 +68,11 @@ export async function GET(req: Request) {
       );
       telegramSent = true;
     }
-  } catch {
-    // best-effort — não quebra a ingestão se o Telegram falhar
+  } catch (err) {
+    // A ingestão já foi gravada; responde 500 só pra falha do Telegram aparecer como erro no
+    // painel do cron (antes era engolida e o cron ficava "verde" com o Telegram morto).
+    console.error("ingest-events: falha ao enviar Telegram", err);
+    return NextResponse.json({ ok: false, results, telegramError: (err as Error).message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, results, telegramSent });
