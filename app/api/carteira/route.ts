@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { addBalanceEntry, getSinceLastUpdateForBroker, BROKERS } from "@/lib/brokerPortfolio";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { requestIsCarteiraAuthorized } from "@/lib/carteiraAuth";
 
 // Dispara alerta se o lucro desde a última atualização cair abaixo disso (%).
 const DRAWDOWN_ALERT_PCT = -5;
 
 export async function POST(req: Request) {
+  if (!(await requestIsCarteiraAuthorized())) {
+    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  }
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "corpo inválido" }, { status: 400 });
 

@@ -175,14 +175,16 @@ function buildTradeIdeas(
       title: `${s.base}/${s.quote}: viés de ${s.signal}`,
       detail: `Força relativa ${s.strengthDiff?.toFixed(2) ?? "—"} e carry ${s.carryDiff.toFixed(2)}pp apontam ${s.signal}, mas sem confirmação diário+semanal ainda — convicção menor.`,
       pairs: [s.pair],
-      conviction: convictionOf(Math.abs(s.score)),
+      // Sem confirmação diário+semanal, o carry sozinho inflava o score até "forte" — o que
+      // contradizia o próprio texto ("convicção menor"). Teto em médio pra esses.
+      conviction: convictionOf(Math.abs(s.score)) === "forte" ? "médio" : convictionOf(Math.abs(s.score)),
       score: Math.abs(s.score),
     });
     usedPairs.add(s.pair);
   }
 
   const order: Record<Conviction, number> = { forte: 0, médio: 1, fraco: 2 };
-  return ideas.sort((a, b) => order[a.conviction] - order[b.conviction]);
+  return ideas.sort((a, b) => order[a.conviction] - order[b.conviction] || b.score - a.score);
 }
 
 export interface EntradaLeg {

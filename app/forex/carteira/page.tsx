@@ -9,6 +9,8 @@ import {
   type SinceLastUpdateStats,
 } from "@/lib/brokerPortfolio";
 import { BrokerBalanceForm } from "@/app/components/BrokerBalanceForm";
+import { redirect } from "next/navigation";
+import { requestIsCarteiraAuthorized } from "@/lib/carteiraAuth";
 import { PortfolioSimulator } from "@/app/components/PortfolioSimulator";
 import { BalanceChart } from "@/app/components/BalanceChart";
 import { EntryRow } from "@/app/components/EntryRow";
@@ -63,6 +65,8 @@ export default async function CarteiraPage({
 }: {
   searchParams: Promise<{ dias?: string }>;
 }) {
+  if (!(await requestIsCarteiraAuthorized())) redirect("/entrar?next=/forex/carteira");
+
   const { dias } = await searchParams;
   const days = Math.min(365, Math.max(1, Number(dias) || 7));
 

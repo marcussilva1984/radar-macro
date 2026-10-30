@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { updateBalanceEntry, deleteBalanceEntry } from "@/lib/brokerPortfolio";
+import { requestIsCarteiraAuthorized } from "@/lib/carteiraAuth";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requestIsCarteiraAuthorized())) {
+    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  }
   const { id } = await params;
   const idNum = Number(id);
   if (!Number.isInteger(idNum)) {
@@ -28,6 +32,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await requestIsCarteiraAuthorized())) {
+    return NextResponse.json({ error: "não autorizado" }, { status: 401 });
+  }
   const { id } = await params;
   const idNum = Number(id);
   if (!Number.isInteger(idNum)) {
