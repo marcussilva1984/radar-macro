@@ -31,6 +31,8 @@ export interface FxPairSignal {
   signal: "alta" | "queda" | "estabilização";
   score: number;
   trendConsistent: boolean; // diário e semanal apontam na mesma direção
+  rsiDaily: number | null;  // RSI(14) no fechamento diário
+  rsiWeekly: number | null; // RSI(14) em velas semanais (~5d cada)
 }
 
 export type Conviction = "forte" | "médio" | "fraco";
@@ -43,22 +45,72 @@ export interface TradeIdea {
   score: number;
 }
 
-function convictionOf(absScore: number): Conviction {
-  if (absScore >= 0.35) return "forte";
-  if (absScore >= SIGNAL_THRESHOLD) return "médio";
-  return "fraco";
+// RSI(14) com suavização de Wilder — série de fechamentos em ordem cronológica.
+function computeRSI(closes: number[], period = 14): number | null {
+  if (closes.length < period + 1) return null;
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) avgGain += diff; else avgLoss -= diff;
+  }
+  avgGain /= period; avgLoss /= period;
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period;
+  }
+  if (avgLoss === 0) return 100;
+  return 100 - 100 / (1 + avgGain / avgLoss);
 }
 
-async function getSeriesBySymbol(days: number): Promise<Map<string, Array<{ date: Date; changePct: number }>>> {
+// Converte série diária em velas semanais tomando o fechamento a cada 5 pregões.
+function toWeeklyCloses(closes: number[]): number[] {
+  const weekly: number[] = [];
+  for (let i = 4; i < closes.length; i += 5) weekly.push(closes[i]);
+  return weekly;
+}
+
+function convictionOf(
+  absScore: number,
+  rsiDaily: number | null = null,
+  rsiWeekly: number | null = null,
+  signal: "alta" | "queda" | "estabilização" = "estabilização"
+): Conviction {
+  let base: Conviction = absScore >= 0.35 ? "forte" : absScore >= SIGNAL_THRESHOLD ? "médio" : "fraco";
+
+  if (signal !== "estabilização") {
+    // RSI extremo: sobrecomprado em alta ou sobrevendido em queda → cap em médio (risco de reversão).
+    const dailyExtreme =
+      (signal === "alta" && rsiDaily !== null && rsiDaily > 72) ||
+      (signal === "queda" && rsiDaily !== null && rsiDaily < 28);
+    const weeklyExtreme =
+      (signal === "alta" && rsiWeekly !== null && rsiWeekly > 75) ||
+      (signal === "queda" && rsiWeekly !== null && rsiWeekly < 25);
+    if ((dailyExtreme || weeklyExtreme) && base === "forte") base = "médio";
+
+    // RSI confirmando tendência em ambos os timeframes: sobe médio → forte.
+    const dailyConfirm =
+      (signal === "alta" && rsiDaily !== null && rsiDaily >= 50 && rsiDaily <= 70) ||
+      (signal === "queda" && rsiDaily !== null && rsiDaily <= 50 && rsiDaily >= 30);
+    const weeklyConfirm =
+      (signal === "alta" && rsiWeekly !== null && rsiWeekly >= 50 && rsiWeekly <= 70) ||
+      (signal === "queda" && rsiWeekly !== null && rsiWeekly <= 50 && rsiWeekly >= 30);
+    if (dailyConfirm && weeklyConfirm && base === "médio") base = "forte";
+  }
+
+  return base;
+}
+
+async function getSeriesBySymbol(days: number): Promise<Map<string, Array<{ date: Date; changePct: number; close: number }>>> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const rows = await db.select().from(flowSeries).where(gte(flowSeries.date, since)).orderBy(flowSeries.date);
 
-  const bySymbol = new Map<string, Array<{ date: Date; changePct: number }>>();
+  const bySymbol = new Map<string, Array<{ date: Date; changePct: number; close: number }>>();
   for (const r of rows) {
     if (r.changePct === null) continue;
     if (!FX_PAIRS.some((p) => p.pair === r.symbol)) continue;
     const list = bySymbol.get(r.symbol) ?? [];
-    list.push({ date: r.date, changePct: r.changePct });
+    list.push({ date: r.date, changePct: r.changePct, close: r.close });
     bySymbol.set(r.symbol, list);
   }
   return bySymbol;
@@ -108,11 +160,14 @@ function buildTradeIdeas(
   // 1. Tendência consistente (diário e semanal concordam) — o sinal mais "seguro" de continuação.
   const consistent = signals.filter((s) => s.trendConsistent && s.signal !== "estabilização");
   for (const s of consistent) {
+    const rsiNote = s.rsiDaily !== null
+      ? ` RSI diário ${s.rsiDaily.toFixed(0)}${s.rsiWeekly !== null ? ` / semanal ${s.rsiWeekly.toFixed(0)}` : ""}.`
+      : "";
     ideas.push({
       title: `${s.base}/${s.quote}: ${s.signal} consistente (diário e semanal)`,
-      detail: `Variação diária ${s.changePct?.toFixed(2)}% e semanal ${s.weeklyChangePct?.toFixed(2)}% na mesma direção — não é só ruído de um dia.`,
+      detail: `Variação diária ${s.changePct?.toFixed(2)}% e semanal ${s.weeklyChangePct?.toFixed(2)}% na mesma direção — não é só ruído de um dia.${rsiNote}`,
       pairs: [s.pair],
-      conviction: convictionOf(Math.abs(s.score)),
+      conviction: convictionOf(Math.abs(s.score), s.rsiDaily, s.rsiWeekly, s.signal),
       score: Math.abs(s.score),
     });
   }
@@ -131,7 +186,7 @@ function buildTradeIdeas(
         title: `${sigA.base}/${sigA.quote} esticado em ${sigA.signal}, ${sigB.base}/${sigB.quote} ainda não acompanhou`,
         detail: `AUD e NZD historicamente correlacionadas (r=${audNzdCorr.toFixed(2)} nos últimos 30 dias) — se ${sigA.base}/${sigA.quote} segue em ${sigA.signal}, há espaço pra ${sigB.base}/${sigB.quote} convergir na mesma direção, especialmente se o diferencial de juros não mudar.`,
         pairs: [a, b],
-        conviction: convictionOf(Math.abs(sigA.score)),
+        conviction: convictionOf(Math.abs(sigA.score), sigA.rsiDaily, sigA.rsiWeekly, sigA.signal),
         score: Math.abs(sigA.score),
       });
     }
@@ -159,7 +214,7 @@ function buildTradeIdeas(
         title: `Hedge sugerido: ${hedgeCandidate.base}/${hedgeCandidate.quote} (${hedgeCandidate.signal})`,
         detail: `Não compartilha moeda com "${idea.title}" — serve pra não concentrar a aposta numa moeda só.`,
         pairs: [hedgeCandidate.pair],
-        conviction: convictionOf(Math.abs(hedgeCandidate.score)),
+        conviction: convictionOf(Math.abs(hedgeCandidate.score), hedgeCandidate.rsiDaily, hedgeCandidate.rsiWeekly, hedgeCandidate.signal),
         score: Math.abs(hedgeCandidate.score),
       });
     }
@@ -171,13 +226,14 @@ function buildTradeIdeas(
   for (const s of signals) {
     if (ideas.length >= MIN_IDEAS) break;
     if (usedPairs.has(s.pair) || s.signal === "estabilização") continue;
+    const baseConv = convictionOf(Math.abs(s.score), s.rsiDaily, s.rsiWeekly, s.signal);
     ideas.push({
       title: `${s.base}/${s.quote}: viés de ${s.signal}`,
-      detail: `Força relativa ${s.strengthDiff?.toFixed(2) ?? "—"} e carry ${s.carryDiff.toFixed(2)}pp apontam ${s.signal}, mas sem confirmação diário+semanal ainda — convicção menor.`,
+      detail: `Força relativa ${s.strengthDiff?.toFixed(2) ?? "—"} e carry ${s.carryDiff.toFixed(2)}pp apontam ${s.signal}, mas sem confirmação diário+semanal ainda — convicção menor.${s.rsiDaily !== null ? ` RSI diário ${s.rsiDaily.toFixed(0)}${s.rsiWeekly !== null ? ` / semanal ${s.rsiWeekly.toFixed(0)}` : ""}.` : ""}`,
       pairs: [s.pair],
       // Sem confirmação diário+semanal, o carry sozinho inflava o score até "forte" — o que
       // contradizia o próprio texto ("convicção menor"). Teto em médio pra esses.
-      conviction: convictionOf(Math.abs(s.score)) === "forte" ? "médio" : convictionOf(Math.abs(s.score)),
+      conviction: baseConv === "forte" ? "médio" : baseConv,
       score: Math.abs(s.score),
     });
     usedPairs.add(s.pair);
@@ -294,7 +350,8 @@ export async function getForexBoard(): Promise<{
   entradas: Entrada[];
   audNzdCorr: number | null;
 }> {
-  const bySymbol = await getSeriesBySymbol(35);
+  // 90 dias: RSI(14) diário precisa de 15+ candles, RSI(14) semanal precisa de 75+ dias.
+  const bySymbol = await getSeriesBySymbol(90);
 
   const dailyChanges = new Map<FxPair, number>();
   const weeklyChanges = new Map<FxPair, number>();
@@ -344,6 +401,12 @@ export async function getForexBoard(): Promise<{
       }
     }
 
+    // RSI(14) diário e semanal a partir dos fechamentos armazenados.
+    const series = bySymbol.get(pair);
+    const closes = series?.map((s) => s.close) ?? [];
+    const rsiDaily = computeRSI(closes, 14);
+    const rsiWeekly = computeRSI(toWeeklyCloses(closes), 14);
+
     const score =
       0.5 * (strengthDiff ?? 0) + 0.2 * carryDiff + 0.3 * (asymmetry !== null ? -asymmetry : 0);
 
@@ -373,6 +436,8 @@ export async function getForexBoard(): Promise<{
       signal,
       score,
       trendConsistent,
+      rsiDaily,
+      rsiWeekly,
     };
   }).sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
 

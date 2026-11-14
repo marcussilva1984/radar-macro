@@ -219,6 +219,7 @@ export default async function ForexPage({
                   <th className="py-2 pr-4">Var. dia</th>
                   <th className="py-2 pr-4">Var. semana</th>
                   <th className="py-2 pr-4">Carry</th>
+                  <th className="py-2 pr-4">RSI D/W</th>
                   <th className="py-2 pr-4">Assimetria</th>
                   <th className="py-2">Sinal</th>
                 </tr>
@@ -245,6 +246,26 @@ export default async function ForexPage({
                     </td>
                     <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">
                       {s.carryDiff.toFixed(2)}pp
+                    </td>
+                    <td className="py-2 pr-4">
+                      {s.rsiDaily !== null ? (
+                        <span className={
+                          s.rsiDaily > 70 ? "text-red-500 dark:text-red-400" :
+                          s.rsiDaily < 30 ? "text-green-500 dark:text-green-400" :
+                          s.rsiDaily >= 50 ? "text-blue-600 dark:text-blue-400" :
+                          "text-zinc-500 dark:text-zinc-400"
+                        }>
+                          {s.rsiDaily.toFixed(0)}
+                          {s.rsiWeekly !== null && (
+                            <span className={
+                              s.rsiWeekly > 70 ? " text-red-500 dark:text-red-400" :
+                              s.rsiWeekly < 30 ? " text-green-500 dark:text-green-400" :
+                              s.rsiWeekly >= 50 ? " text-blue-600 dark:text-blue-400" :
+                              " text-zinc-500 dark:text-zinc-400"
+                            }>/{s.rsiWeekly.toFixed(0)}</span>
+                          )}
+                        </span>
+                      ) : <span className="text-zinc-400">—</span>}
                     </td>
                     <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">
                       {s.asymmetry !== null ? s.asymmetry.toFixed(2) : "—"}

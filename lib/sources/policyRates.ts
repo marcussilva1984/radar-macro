@@ -24,9 +24,9 @@ export const POLICY_RATES: Record<string, number> = Object.fromEntries(
 
 export const POLICY_RATES_UPDATED_AT = "2026-10-30";
 
-// Depois disso o painel de carry avisa que as taxas podem estar velhas (bancos centrais se
-// reúnem a cada ~6 semanas).
-export const POLICY_RATES_STALE_AFTER_DAYS = 45;
+// Depois disso o painel de carry avisa que as taxas podem estar velhas. BoE e RBA se reúnem
+// mensalmente, então 20 dias captura qualquer reunião que tenha passado sem atualização.
+export const POLICY_RATES_STALE_AFTER_DAYS = 20;
 
 export function policyRatesAgeDays(now: Date = new Date()): number {
   return Math.floor((now.getTime() - new Date(`${POLICY_RATES_UPDATED_AT}T12:00:00Z`).getTime()) / 86_400_000);

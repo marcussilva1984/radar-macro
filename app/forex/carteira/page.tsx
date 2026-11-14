@@ -439,7 +439,7 @@ export default async function CarteiraPage({
             </table>
           </div>
 
-          <PortfolioSimulator initialBalance={totalBalance} monthProgress={monthProgress} />
+          <PortfolioSimulator initialBalance={totalBalance} />
         </>
       )}
       </div>
