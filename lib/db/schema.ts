@@ -123,7 +123,7 @@ export const brokerBalances = pgTable(
   "broker_balances",
   {
     id: serial("id").primaryKey(),
-    broker: text("broker").notNull(), // 'EBC' | 'AXI' | 'ICMarkets' | 'FBS'
+    broker: text("broker").notNull(), // 'EBC' | 'ICMarkets' | 'FBS'
     entryDate: timestamp("entry_date", { withTimezone: true }).notNull(),
     balance: doublePrecision("balance").notNull(),
     deposit: doublePrecision("deposit").notNull().default(0),

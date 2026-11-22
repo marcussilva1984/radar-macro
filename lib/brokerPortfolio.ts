@@ -19,7 +19,7 @@ export async function setMonthlyGoalPct(pct: number): Promise<void> {
     .onConflictDoUpdate({ target: carteiraSettings.id, set: { monthlyGoalPct: pct, updatedAt: new Date() } });
 }
 
-export const BROKERS = ["EBC", "AXI", "ICMarkets", "FBS"] as const;
+export const BROKERS = ["EBC", "ICMarkets", "FBS"] as const;
 export type Broker = (typeof BROKERS)[number];
 
 export interface BalanceEntry {
