@@ -121,10 +121,11 @@ export async function getBrokerSummaries(days: number): Promise<BrokerSummary[]>
   });
 }
 
-// Todos os lançamentos de todas as corretoras, mais recente primeiro — o "extrato" de quando
+// Todos os lançamentos das corretoras ativas, mais recente primeiro — o "extrato" de quando
 // cada depósito/retirada/atualização de saldo foi feita.
 export async function getAllEntries(): Promise<BalanceEntry[]> {
-  return [...(await loadBalancesAsc())].reverse();
+  const rows = await loadBalancesAsc();
+  return [...rows.filter((r) => (BROKERS as readonly string[]).includes(r.broker))].reverse();
 }
 
 export async function getHistory(broker: string): Promise<BalanceEntry[]> {
