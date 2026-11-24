@@ -10,6 +10,8 @@ const LINKS = [
   { href: "/cripto", label: "Cripto" },
   { href: "/correlacoes", label: "Correlações" },
   { href: "/fluxo", label: "Mapa de Fluxo" },
+  { href: "/acoes", label: "Ações" },
+  { href: "/fiis", label: "FIIs" },
   { href: "/semana", label: "Resumo da semana" },
   { href: "/videos", label: "Vídeos" },
 ];
