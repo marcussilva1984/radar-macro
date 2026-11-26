@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { Portfolio } from "./Portfolio";
 
 interface Bond {
   year: number;
@@ -182,7 +183,7 @@ function Simulator({ bonds }: { bonds: Bond[] }) {
 }
 
 export default function RendaFixaPage() {
-  const [tab, setTab] = useState<"simular" | "comparar">("simular");
+  const [tab, setTab] = useState<"simular" | "comparar" | "carteira">("simular");
   const [bonds, setBonds] = useState<Bond[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -267,13 +268,13 @@ export default function RendaFixaPage() {
         </div>
         {referenceDate && (
           <span className="text-xs text-gray-500">
-            Taxas ANBIMA de {referenceDate.split("-").reverse().join("/")}
+            Taxas ANBIMA de {referenceDate.split("-").reverse().join("/")} · atualiza 1x por dia útil, à noite
           </span>
         )}
       </div>
 
       <div className="flex gap-4 border-b border-zinc-200 dark:border-gray-700">
-        {([["simular", "Simular um ano"], ["comparar", "Comparar todos os anos"]] as const).map(([key, label]) => (
+        {([["simular", "Simular um ano"], ["comparar", "Comparar todos os anos"], ["carteira", "Minha carteira"]] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`text-sm pb-2 -mb-px border-b-2 ${
               tab === key ? "border-blue-600 font-semibold text-zinc-900 dark:text-white" : "border-transparent text-gray-500"
@@ -283,7 +284,7 @@ export default function RendaFixaPage() {
         ))}
       </div>
 
-      {loading && <p className="text-zinc-600 dark:text-gray-400 text-sm">Buscando taxas ao vivo...</p>}
+      {loading && <p className="text-zinc-600 dark:text-gray-400 text-sm">Buscando taxas...</p>}
       {fetchError && (
         <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-sm text-yellow-700 dark:text-yellow-300">
           Não foi possível buscar taxas: {fetchError}. Tente recarregar.
@@ -294,6 +295,7 @@ export default function RendaFixaPage() {
       )}
 
       {tab === "simular" && <Simulator bonds={bonds} />}
+      {tab === "carteira" && <Portfolio bonds={bonds} />}
 
       {tab === "comparar" && (
       <>
