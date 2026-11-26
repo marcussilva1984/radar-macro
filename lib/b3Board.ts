@@ -67,12 +67,15 @@ export interface StockRow {
 export interface FiiRow {
   fii: B3Fii;
   price: number | null;
-  changePct: number | null;
-  pvp: number | null;          // preço / VPA
-  monthlyDY: number;           // DY mensal da config
-  rsiDaily: number | null;
-  rsiWeekly: number | null;
-  signal: "compra" | "neutro" | "caro";
+  pvp: number | null;
+  monthlyDY: number;
+  // Desconto em relação à máxima dos últimos 20 pregões (negativo = abaixo da máxima)
+  desconto20d: number | null;
+  // % acima/abaixo da MM20 (negativo = preço abaixo da média → possível suporte)
+  mma20dist: number | null;
+  // Últimos 31 fechamentos para o cliente calcular variação em N dias (1-30)
+  closes30: number[];
+  signal: "oportunidade" | "descontado" | "neutro" | "caro";
 }
 
 export async function getStockBoard(): Promise<StockRow[]> {
@@ -103,18 +106,37 @@ export async function getFiiBoard(): Promise<FiiRow[]> {
 
   return B3_FIIS.map((fii): FiiRow => {
     const data = series.get(fii.symbol);
-    if (!data || data.closes.length < 2) {
-      return { fii, price: null, changePct: null, pvp: null, monthlyDY: fii.monthlyDY, rsiDaily: null, rsiWeekly: null, signal: "neutro" };
-    }
+    const empty: FiiRow = {
+      fii, price: null, pvp: null, monthlyDY: fii.monthlyDY,
+      desconto20d: null, mma20dist: null, closes30: [], signal: "neutro",
+    };
+    if (!data || data.closes.length < 2) return empty;
+
     const { price, closes } = data;
-    const prev1 = closes[closes.length - 2];
-    const changePct = ((price - prev1) / prev1) * 100;
     const pvp = price / fii.vpa;
-    const rsiDaily = computeRSI(closes);
-    const weekly = toWeeklyCloses(closes);
-    const rsiWeekly = computeRSI(weekly);
-    // Sinal: P/VP < 0.95 e RSI não extremo = oportunidade; P/VP > 1.10 = caro
-    const signal: FiiRow["signal"] = pvp < 0.95 && (rsiDaily === null || rsiDaily < 70) ? "compra" : pvp > 1.10 ? "caro" : "neutro";
-    return { fii, price, changePct, pvp, monthlyDY: fii.monthlyDY, rsiDaily, rsiWeekly, signal };
+
+    // Desconto da máxima dos últimos 20 pregões
+    const window20 = closes.slice(-20);
+    const high20 = Math.max(...window20);
+    const desconto20d = high20 > 0 ? ((price - high20) / high20) * 100 : null;
+
+    // Distância da MM20 (média simples dos últimos 20 fechamentos)
+    const mma20 = window20.reduce((a, b) => a + b, 0) / window20.length;
+    const mma20dist = mma20 > 0 ? ((price - mma20) / mma20) * 100 : null;
+
+    // Últimos 31 closes para o cliente calcular variação em 1-30 dias
+    const closes30 = closes.slice(-31);
+
+    // Sinal combinado: P/VP + desconto
+    let signal: FiiRow["signal"] = "neutro";
+    if (pvp > 1.10) {
+      signal = "caro";
+    } else if (pvp < 0.95 && desconto20d !== null && desconto20d < -5) {
+      signal = "oportunidade"; // barato pelo P/VP E já caiu bastante da máxima recente
+    } else if (pvp < 1.0 && desconto20d !== null && desconto20d < -3) {
+      signal = "descontado";
+    }
+
+    return { fii, price, pvp, monthlyDY: fii.monthlyDY, desconto20d, mma20dist, closes30, signal };
   });
 }
