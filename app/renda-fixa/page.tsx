@@ -80,7 +80,109 @@ const CLASS_ORDER: ClassKey[] = ["forex", "acoes", "fiis", "crypto", "prefixado"
 
 type Allocs = Record<ClassKey, number>;
 
+const parseBRL = (s: string) => parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0;
+
+const FIELD = "bg-zinc-100 dark:bg-gray-700 border border-zinc-300 dark:border-gray-600 text-zinc-900 dark:text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500";
+
+function Simulator({ bonds }: { bonds: Bond[] }) {
+  const [year, setYear] = useState(2035);
+  const [monthlyInput, setMonthlyInput] = useState("400");
+  const [initialInput, setInitialInput] = useState("0");
+
+  const bond = bonds.find((b) => b.year === year) ?? bonds[0];
+  if (!bond) return null;
+
+  const monthly = parseBRL(monthlyInput);
+  const initial = parseBRL(initialInput);
+  const months = monthsUntil(bond.maturity);
+  const at = (m: number) => {
+    const total = calcFV(initial, monthly, bond.annualRate, m);
+    const invested = initial + monthly * m;
+    return { total, invested, interest: total - invested };
+  };
+  const end = at(months);
+
+  const now = new Date();
+  const rows: { label: string; m: number }[] = [];
+  for (let m = 12; m < months; m += 12) rows.push({ label: String(now.getFullYear() + m / 12), m });
+  rows.push({ label: `Vencimento (${maturityLabel(bond.maturity)})`, m: months });
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white dark:bg-gray-800/50 border border-zinc-200 dark:border-gray-700 rounded-xl p-5 flex flex-wrap gap-6 items-start">
+        <label className="block">
+          <span className="block text-xs text-zinc-600 dark:text-gray-400 mb-1">Valor por mês (R$)</span>
+          <input type="text" inputMode="decimal" value={monthlyInput} onChange={(e) => setMonthlyInput(e.target.value)}
+            className={`${FIELD} w-40 text-2xl font-bold`} />
+        </label>
+        <label className="block">
+          <span className="block text-xs text-zinc-600 dark:text-gray-400 mb-1">Vencimento</span>
+          <select value={bond.year} onChange={(e) => setYear(Number(e.target.value))} className={`${FIELD} text-sm`}>
+            {bonds.map((b) => (
+              <option key={b.year} value={b.year}>
+                {maturityLabel(b.maturity)} — {b.annualRate.toFixed(2)}%{(b.source === "curva" || b.source === "projecao") && " (estimativa)"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-xs text-zinc-600 dark:text-gray-400 mb-1">Aporte inicial (R$)</span>
+          <input type="text" inputMode="decimal" value={initialInput} onChange={(e) => setInitialInput(e.target.value)}
+            className={`${FIELD} w-32 text-sm`} />
+        </label>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800/40 border border-zinc-200 dark:border-gray-700 rounded-xl p-5">
+        <div className="text-xs text-gray-500">{SOURCE_LABELS[bond.source]} · {fmtPct(bond.annualRate)} · {months} meses</div>
+        <div className="text-sm text-zinc-600 dark:text-gray-400 mt-3">Em {maturityLabel(bond.maturity)} você teria</div>
+        <div className="text-4xl font-bold text-green-600 dark:text-green-400">{fmtBRL(end.total)}</div>
+        <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
+          <div>
+            <div className="text-xs text-gray-500">Você colocou</div>
+            <div className="font-semibold text-zinc-800 dark:text-gray-200">{fmtBRL(end.invested)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Juros</div>
+            <div className="font-semibold text-blue-600 dark:text-blue-400">{fmtBRL(end.interest)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">Líquido (IR 15%)</div>
+            <div className="font-semibold text-zinc-800 dark:text-gray-200">{fmtBRL(end.total - end.interest * 0.15)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="text-sm w-full">
+          <thead>
+            <tr className="text-gray-500 border-b border-zinc-200 dark:border-gray-700">
+              <th className="pb-1 pr-4 text-left">Ano</th>
+              <th className="pb-1 pr-4 text-right">Você colocou</th>
+              <th className="pb-1 pr-4 text-right">Juros</th>
+              <th className="pb-1 text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ label, m }) => {
+              const r = at(m);
+              return (
+                <tr key={m} className="border-b border-zinc-200 dark:border-gray-800">
+                  <td className="py-1.5 pr-4 text-zinc-600 dark:text-gray-400">{label}</td>
+                  <td className="py-1.5 pr-4 text-right text-zinc-600 dark:text-gray-400">{fmtBRL(r.invested)}</td>
+                  <td className="py-1.5 pr-4 text-right text-blue-600 dark:text-blue-400">{fmtBRL(r.interest)}</td>
+                  <td className="py-1.5 text-right font-medium text-green-600 dark:text-green-400">{fmtBRL(r.total)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function RendaFixaPage() {
+  const [tab, setTab] = useState<"simular" | "comparar">("simular");
   const [bonds, setBonds] = useState<Bond[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -170,6 +272,31 @@ export default function RendaFixaPage() {
         )}
       </div>
 
+      <div className="flex gap-4 border-b border-zinc-200 dark:border-gray-700">
+        {([["simular", "Simular um ano"], ["comparar", "Comparar todos os anos"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`text-sm pb-2 -mb-px border-b-2 ${
+              tab === key ? "border-blue-600 font-semibold text-zinc-900 dark:text-white" : "border-transparent text-gray-500"
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <p className="text-zinc-600 dark:text-gray-400 text-sm">Buscando taxas ao vivo...</p>}
+      {fetchError && (
+        <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-sm text-yellow-700 dark:text-yellow-300">
+          Não foi possível buscar taxas: {fetchError}. Tente recarregar.
+        </div>
+      )}
+      {!loading && bonds.length === 0 && !fetchError && (
+        <p className="text-zinc-600 dark:text-gray-400 text-sm">Nenhum Prefixado encontrado.</p>
+      )}
+
+      {tab === "simular" && <Simulator bonds={bonds} />}
+
+      {tab === "comparar" && (
+      <>
       {/* Toggle modo */}
       <div className="flex gap-2">
         <button onClick={() => setUseAllocator(false)}
@@ -319,16 +446,6 @@ export default function RendaFixaPage() {
         </div>
       </div>
 
-      {loading && <p className="text-zinc-600 dark:text-gray-400 text-sm">Buscando taxas ao vivo...</p>}
-      {fetchError && (
-        <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-sm text-yellow-700 dark:text-yellow-300">
-          Não foi possível buscar taxas: {fetchError}. Tente recarregar.
-        </div>
-      )}
-      {!loading && bonds.length === 0 && !fetchError && (
-        <p className="text-zinc-600 dark:text-gray-400 text-sm">Nenhum Prefixado encontrado.</p>
-      )}
-
       {bonds.length > 0 && (
         <div>
           <h2 className="text-base font-semibold text-zinc-700 dark:text-gray-300 mb-2">Taxas por ano</h2>
@@ -438,8 +555,11 @@ export default function RendaFixaPage() {
         </div>
       )}
 
+      </>
+      )}
+
       <p className="text-xs text-gray-600">
-        Taxas indicativas do mercado secundário (ANBIMA, fechamento do dia anterior). A taxa na sua corretora ou no Tesouro Direto pode ser um pouco diferente. Simulação considera a taxa de hoje em todos os aportes (na prática cada compra trava a taxa do dia) e, nos títulos com juros semestrais, o reinvestimento dos cupons. Não desconta IR (15% sobre os juros acima de 2 anos) nem custódia da B3 (0,2% a.a.).
+        Taxas indicativas do mercado secundário (ANBIMA, fechamento do dia anterior). A taxa na sua corretora ou no Tesouro Direto pode ser um pouco diferente. Simulação considera a taxa de hoje em todos os aportes (na prática cada compra trava a taxa do dia) e, nos títulos com juros semestrais, o reinvestimento dos cupons. Valores brutos, exceto onde diz líquido (IR aproximado de 15% sobre os juros; aportes com menos de 2 anos pagam um pouco mais). Não desconta a custódia da B3 (0,2% a.a.).
       </p>
     </main>
   );
