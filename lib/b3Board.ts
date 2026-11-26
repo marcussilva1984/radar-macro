@@ -56,12 +56,11 @@ async function loadSeries(symbols: string[]): Promise<Map<string, { price: numbe
 export interface StockRow {
   stock: B3Stock;
   price: number | null;
-  changePct: number | null;    // variação 1 dia
-  changePct5d: number | null;  // variação 5 dias
-  rsiDaily: number | null;
-  rsiWeekly: number | null;
+  desconto20d: number | null;  // % abaixo da máxima dos últimos 20 pregões
+  mma20dist: number | null;    // % acima/abaixo da MM20
+  closes30: number[];          // últimos 31 fechamentos para variação em N dias
   momentum: "alta" | "queda" | "neutro";
-  dividendYield12m: number;    // DY estimado (da config)
+  dividendYield12m: number;
 }
 
 export interface FiiRow {
@@ -84,19 +83,20 @@ export async function getStockBoard(): Promise<StockRow[]> {
 
   return B3_STOCKS.map((stock): StockRow => {
     const data = series.get(stock.symbol);
-    if (!data || data.closes.length < 2) {
-      return { stock, price: null, changePct: null, changePct5d: null, rsiDaily: null, rsiWeekly: null, momentum: "neutro", dividendYield12m: stock.dividendYield12m };
-    }
+    const empty: StockRow = { stock, price: null, desconto20d: null, mma20dist: null, closes30: [], momentum: "neutro", dividendYield12m: stock.dividendYield12m };
+    if (!data || data.closes.length < 2) return empty;
+
     const { price, closes } = data;
-    const prev1 = closes[closes.length - 2];
+    const window20 = closes.slice(-20);
+    const high20 = Math.max(...window20);
+    const desconto20d = high20 > 0 ? ((price - high20) / high20) * 100 : null;
+    const mma20 = window20.reduce((a, b) => a + b, 0) / window20.length;
+    const mma20dist = mma20 > 0 ? ((price - mma20) / mma20) * 100 : null;
+    const closes30 = closes.slice(-31);
     const prev5 = closes.length >= 6 ? closes[closes.length - 6] : closes[0];
-    const changePct = ((price - prev1) / prev1) * 100;
     const changePct5d = ((price - prev5) / prev5) * 100;
-    const rsiDaily = computeRSI(closes);
-    const weekly = toWeeklyCloses(closes);
-    const rsiWeekly = computeRSI(weekly);
     const momentum = changePct5d > 1.5 ? "alta" : changePct5d < -1.5 ? "queda" : "neutro";
-    return { stock, price, changePct, changePct5d, rsiDaily, rsiWeekly, momentum, dividendYield12m: stock.dividendYield12m };
+    return { stock, price, desconto20d, mma20dist, closes30, momentum, dividendYield12m: stock.dividendYield12m };
   });
 }
 
