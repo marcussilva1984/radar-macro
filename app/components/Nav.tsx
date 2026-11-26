@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/fluxo", label: "Mapa de Fluxo" },
   { href: "/acoes", label: "Ações" },
   { href: "/fiis", label: "FIIs" },
+  { href: "/renda-fixa", label: "Renda Fixa" },
   { href: "/semana", label: "Resumo da semana" },
   { href: "/videos", label: "Vídeos" },
 ];
